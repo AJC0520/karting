@@ -24,7 +24,6 @@ const saveRace = (race: Race) => {
   <section v-if="tournament" class="space-y-8">
     <header class="space-y-4">
       <div>
-        <p class="text-xs uppercase tracking-[0.3em] text-muted">Add race</p>
         <h2 class="text-3xl font-semibold">{{ tournament.name }}</h2>
       </div>
       <TournamentTabs />

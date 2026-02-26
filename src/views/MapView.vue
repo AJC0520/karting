@@ -15,7 +15,6 @@ const tournament = computed(() => store.getTournamentById(route.params.id as str
   <section v-if="tournament" class="space-y-8">
     <header class="space-y-4">
       <div>
-        <p class="text-xs uppercase tracking-[0.3em] text-muted">Track Map</p>
         <h2 class="text-3xl font-semibold">{{ tournament.name }}</h2>
       </div>
       <TournamentTabs />

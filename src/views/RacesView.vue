@@ -70,7 +70,6 @@ const deleteRace = (race: Race) => {
     <header class="space-y-4">
       <div class="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <p class="text-xs uppercase tracking-[0.3em] text-muted">Races</p>
           <h2 class="text-3xl font-semibold">{{ tournament.name }}</h2>
         </div>
         <button class="btn btn-primary" type="button" @click="router.push(`/t/${tournament.id}/add-race`)">

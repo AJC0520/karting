@@ -72,7 +72,6 @@ const longestStreak = computed(() => {
     <header class="space-y-4">
       <div class="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <p class="text-xs uppercase tracking-[0.3em] text-muted">Leaderboard</p>
           <h2 class="text-3xl font-semibold">{{ tournament.name }}</h2>
         </div>
         <div class="text-sm text-muted">
