@@ -155,11 +155,6 @@ const longestStreak = computed(() => {
             helper: stats.mostPlayedTrack ? `${stats.mostPlayedTrack.count} races` : undefined,
           },
           {
-            label: 'Closest race',
-            value: stats.closestRace ? formatNumber(stats.closestRace.spread, 2) : '—',
-            helper: stats.closestRace ? `${stats.closestRace.track} · ${formatDateTime(stats.closestRace.timestamp)}` : undefined,
-          },
-          {
             label: 'Top win rate',
             value: topWinRate?.player.name ?? '—',
             helper: topWinRate ? `${topWinRate.wins} wins in ${topWinRate.total} races` : undefined,
