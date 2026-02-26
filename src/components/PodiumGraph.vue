@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import type { Tournament, ID } from '@/types'
 import { getLeaderboard } from '@/utils/stats'
 
@@ -12,6 +12,16 @@ type PlayerRaceData = {
   playerName: string
   points: (number | null)[] // total points after each race
   color: string
+}
+
+type HoveredChange = {
+  raceIndex: number
+  x: number
+  y: number
+  newLeader: string
+  previousLeader: string
+  newLeaderColor: string
+  previousLeaderColor: string
 }
 
 const racesSorted = computed(() => 
@@ -47,6 +57,9 @@ const graphData = computed((): PlayerRaceData[] => {
     
     // Get leaderboard after this race
     const leaderboard = getLeaderboard(partialTournament)
+    const totalsByPlayer = new Map<ID, number>(
+      leaderboard.map((entry) => [entry.player.id, entry.totalPoints])
+    )
     
     // Record each player's total points
     leaderboard.forEach((entry) => {
@@ -150,6 +163,55 @@ const getPathData = (points: (number | null)[]): string => {
   return path.join(' ')
 }
 
+const getCubicBezier = (t: number, p0: number, p1: number, p2: number, p3: number): number => {
+  const mt = 1 - t
+  return (
+    mt * mt * mt * p0 +
+    3 * mt * mt * t * p1 +
+    3 * mt * t * t * p2 +
+    t * t * t * p3
+  )
+}
+
+const getSegmentX = (raceIndex: number, t: number): number => {
+  const x0 = getX(raceIndex - 1)
+  const x1 = getX(raceIndex)
+  const midX = (x0 + x1) / 2
+  const cp1x = x0 + (midX - x0) * 0.8
+  const cp2x = x1 - (x1 - midX) * 0.8
+  return getCubicBezier(t, x0, cp1x, cp2x, x1)
+}
+
+const getSegmentY = (y0: number, y1: number, t: number): number => {
+  return getCubicBezier(t, y0, y0, y1, y1)
+}
+
+const findCrossingT = (y0a: number, y1a: number, y0b: number, y1b: number): number | null => {
+  const diffAt = (t: number) => getSegmentY(y0a, y1a, t) - getSegmentY(y0b, y1b, t)
+  let d0 = diffAt(0)
+  let d1 = diffAt(1)
+
+  if (Math.abs(d0) < 1e-6) return 0
+  if (Math.abs(d1) < 1e-6) return 1
+  if (d0 * d1 > 0) return null
+
+  let lo = 0
+  let hi = 1
+  for (let i = 0; i < 30; i += 1) {
+    const mid = (lo + hi) / 2
+    const dm = diffAt(mid)
+    if (Math.abs(dm) < 1e-4) return mid
+    if (dm * d0 > 0) {
+      lo = mid
+      d0 = dm
+    } else {
+      hi = mid
+    }
+  }
+
+  return (lo + hi) / 2
+}
+
 const yAxisLabels = computed(() => {
   const labels = []
   const max = maxPoints.value
@@ -207,49 +269,100 @@ const leadershipChanges = computed(() => {
     newLeaderColor: string
     previousLeaderColor: string
   }> = []
-  
+
+  let previousTotals: Map<ID, number> | null = null
   let previousLeader: ID | null = null
-  
+
   racesSorted.value.forEach((race, raceIndex) => {
     // Create a temporary tournament with races up to this point
     const partialTournament = {
       ...props.tournament,
       races: racesSorted.value.slice(0, raceIndex + 1)
     }
-    
+
     // Get leaderboard after this race
     const leaderboard = getLeaderboard(partialTournament)
-    
+    const totalsByPlayer = new Map<ID, number>(
+      leaderboard.map((entry) => [entry.player.id, entry.totalPoints])
+    )
+
     if (leaderboard.length > 0) {
       const currentLeader = leaderboard[0].player.id
-      
+
       // Check if leader changed
       if (previousLeader !== null && currentLeader !== previousLeader) {
         const previousLeaderName = props.tournament.players.find(p => p.id === previousLeader)?.name || ''
         const currentLeaderName = leaderboard[0].player.name
         const currentLeaderPoints = leaderboard[0].totalPoints
-        
+
         // Find colors of both leaders
         const newLeaderData = graphData.value.find(p => p.playerId === currentLeader)
         const previousLeaderData = graphData.value.find(p => p.playerId === previousLeader)
-        
+
+        let x = getX(raceIndex)
+        let y = getY(currentLeaderPoints)
+
+        if (previousTotals && raceIndex > 0) {
+          const prevStart = previousTotals.get(previousLeader)
+          const prevEnd = totalsByPlayer.get(previousLeader)
+          const currStart = previousTotals.get(currentLeader)
+          const currEnd = totalsByPlayer.get(currentLeader)
+
+          if (
+            prevStart !== undefined && prevEnd !== undefined &&
+            currStart !== undefined && currEnd !== undefined
+          ) {
+            const y0Prev = getY(prevStart)
+            const y1Prev = getY(prevEnd)
+            const y0Curr = getY(currStart)
+            const y1Curr = getY(currEnd)
+            const t = findCrossingT(y0Prev, y1Prev, y0Curr, y1Curr)
+            if (t !== null) {
+              x = getSegmentX(raceIndex, t)
+              y = getSegmentY(y0Curr, y1Curr, t)
+            }
+          }
+        }
+
         changes.push({
           raceIndex,
-          x: getX(raceIndex),
-          y: getY(currentLeaderPoints), // Y position based on points
+          x,
+          y,
           newLeader: currentLeaderName,
           previousLeader: previousLeaderName,
           newLeaderColor: newLeaderData?.color || '#ef4444',
           previousLeaderColor: previousLeaderData?.color || '#6b7280'
         })
       }
-      
+
       previousLeader = currentLeader
     }
+
+    previousTotals = totalsByPlayer
   })
-  
+
   return changes
 })
+
+
+const graphContainerRef = ref<HTMLDivElement | null>(null)
+const svgRef = ref<SVGSVGElement | null>(null)
+const hoveredChange = ref<{ left: number; top: number; data: HoveredChange } | null>(null)
+
+const showTooltip = (change: HoveredChange) => {
+  if (!svgRef.value || !graphContainerRef.value) return
+  const svgRect = svgRef.value.getBoundingClientRect()
+  const containerRect = graphContainerRef.value.getBoundingClientRect()
+  const scaleX = svgRect.width / width
+  const scaleY = svgRect.height / height
+  const left = change.x * scaleX + (svgRect.left - containerRect.left)
+  const top = change.y * scaleY + (svgRect.top - containerRect.top)
+  hoveredChange.value = { left, top, data: change }
+}
+
+const hideTooltip = () => {
+  hoveredChange.value = null
+}
 </script>
 
 <template>
@@ -259,10 +372,11 @@ const leadershipChanges = computed(() => {
       <p class="text-sm text-muted mt-1">Total points accumulated after each race</p>
     </div>
     
-    <div v-if="racesSorted.length > 0" class="relative">
+    <div v-if="racesSorted.length > 0" class="relative" ref="graphContainerRef">
       <!-- SVG Graph -->
       <div class="w-full overflow-x-auto">
         <svg 
+          ref="svgRef"
           :viewBox="`0 0 ${width} ${height}`" 
           class="w-full" 
           style="max-width: 100%; height: auto;"
@@ -344,7 +458,10 @@ const leadershipChanges = computed(() => {
           </g>
           
           <!-- Leadership change markers -->
-          <g v-for="(change, index) in leadershipChanges" :key="`change-${index}`">
+          <g
+            v-for="(change, index) in leadershipChanges"
+            :key="`change-${index}`"
+          >
             <!-- Vertical line marker -->
             <line
               :x1="change.x"
@@ -355,47 +472,65 @@ const leadershipChanges = computed(() => {
               stroke-width="1"
               stroke-dasharray="3 3"
               class="opacity-30"
+              pointer-events="none"
             />
             
-            <!-- Circle marker at top -->
-            <circle
-              :cx="change.x"
-              :cy="change.y"
-              r="5"
-              :fill="change.newLeaderColor"
-              stroke="white"
-              stroke-width="2"
-            />
-            
-            <!-- Text label -->
-            <g>
-              <!-- Background rect for readability -->
-              <rect
-                :x="change.x - 70"
-                :y="change.y - 35"
-                width="140"
-                height="26"
-                fill="white"
-                stroke="#e5e7eb"
-                stroke-width="1"
-                rx="4"
-                opacity="0.95"
+            <!-- Hoverable dot marker -->
+            <g
+              class="cursor-pointer"
+              @mouseenter="showTooltip(change)"
+              @mouseleave="hideTooltip"
+            >
+              <circle
+                :cx="change.x"
+                :cy="change.y"
+                r="9"
+                :stroke="change.newLeaderColor"
+                stroke-width="2"
+                fill="none"
+                opacity="0.35"
               />
-              
-              <!-- Text showing overtake -->
-              <text
-                :x="change.x"
-                :y="change.y - 18"
-                text-anchor="middle"
-                class="text-xs font-medium"
-              >
-                <tspan :fill="change.newLeaderColor" font-weight="700">{{ change.newLeader }}</tspan>
-                <tspan fill="#6b7280"> overtakes </tspan>
-                <tspan :fill="change.previousLeaderColor" font-weight="700">{{ change.previousLeader }}</tspan>
-              </text>
+              <circle
+                :cx="change.x"
+                :cy="change.y"
+                r="6"
+                :fill="change.newLeaderColor"
+                stroke="white"
+                stroke-width="2"
+              />
+              <circle
+                :cx="change.x"
+                :cy="change.y"
+                r="10"
+                fill="transparent"
+              />
             </g>
           </g>
         </svg>
+      </div>
+      <div
+        v-if="hoveredChange"
+        class="pointer-events-none absolute z-20"
+        :style="{ left: `${hoveredChange.left}px`, top: `${hoveredChange.top}px` }"
+      >
+        <div class="relative -translate-x-1/2 -translate-y-full -mt-3">
+          <div
+            class="rounded-md border border-zinc-200/80 bg-white/95 px-3 py-1.5 text-xs text-zinc-700 shadow-lg backdrop-blur"
+          >
+            <div class="flex items-center gap-1">
+              <span :style="{ color: hoveredChange.data.newLeaderColor }" class="font-semibold">
+                {{ hoveredChange.data.newLeader }}
+              </span>
+              <span class="text-muted">overtakes</span>
+              <span :style="{ color: hoveredChange.data.previousLeaderColor }" class="font-semibold">
+                {{ hoveredChange.data.previousLeader }}
+              </span>
+            </div>
+          </div>
+          <div
+            class="absolute left-1/2 top-full -translate-x-1/2 -mt-1 h-2 w-2 rotate-45 border-r border-b border-zinc-200/80 bg-white/95"
+          ></div>
+        </div>
       </div>
       
       <!-- Legend positioned over graph -->
