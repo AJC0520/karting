@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { useAppStore } from '@/stores/appStore'
@@ -7,18 +7,8 @@ import { formatDate } from '@/utils/format'
 
 const store = useAppStore()
 const router = useRouter()
-const newName = ref('')
 
 const tournaments = computed(() => store.tournaments)
-
-const createTournament = async () => {
-  if (!newName.value.trim()) return
-  const id = await store.createTournament(newName.value)
-  newName.value = ''
-  if (id) {
-    router.push(`/t/${id}/leaderboard`)
-  }
-}
 </script>
 
 <template>
@@ -28,10 +18,11 @@ const createTournament = async () => {
       <p class="mt-2 text-sm text-muted">
         Create a tournament, add your players, and keep track of every race across months of sessions.
       </p>
-      <form class="mt-4 flex flex-wrap gap-3" @submit.prevent="createTournament">
-        <input v-model="newName" class="input w-64" placeholder="Tournament name" />
-        <button class="btn btn-primary" type="submit">Create tournament</button>
-      </form>
+      <div class="mt-4">
+        <RouterLink to="/create-tournament" class="btn btn-primary">
+          Create tournament
+        </RouterLink>
+      </div>
     </div>
 
     <div>

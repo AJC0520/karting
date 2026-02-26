@@ -1,6 +1,7 @@
 import type { RouteRecordRaw } from 'vue-router'
 
 import HomeView from '@/views/HomeView.vue'
+import CreateTournamentView from '@/views/CreateTournamentView.vue'
 import LeaderboardView from '@/views/LeaderboardView.vue'
 import RacesView from '@/views/RacesView.vue'
 import AddRaceView from '@/views/AddRaceView.vue'
@@ -26,6 +27,12 @@ export const routes: RouteRecordRaw[] = [
     path: '/',
     name: 'home',
     component: HomeView,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/create-tournament',
+    name: 'create-tournament',
+    component: CreateTournamentView,
     meta: { requiresAuth: true },
   },
   {

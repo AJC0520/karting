@@ -7,10 +7,10 @@ const tournamentId = computed(() => route.params.id as string)
 
 const links = computed(() => [
   { label: 'Leaderboard', to: `/t/${tournamentId.value}/leaderboard` },
+  { label: 'Map', to: `/t/${tournamentId.value}/map` },
   { label: 'Races', to: `/t/${tournamentId.value}/races` },
   { label: 'Add Race', to: `/t/${tournamentId.value}/add-race` },
   { label: 'Players', to: `/t/${tournamentId.value}/players` },
-  { label: 'Map', to: `/t/${tournamentId.value}/map` },
 ])
 </script>
 

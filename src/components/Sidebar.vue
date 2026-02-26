@@ -10,21 +10,11 @@ const authStore = useAuthStore()
 const router = useRouter()
 const route = useRoute()
 
-const newName = ref('')
 const editingId = ref<string | null>(null)
 const editingName = ref('')
 
 const tournaments = computed(() => store.tournaments)
 const activeId = computed(() => route.params.id as string | undefined)
-
-const createTournament = async () => {
-  if (!newName.value.trim()) return
-  const id = await store.createTournament(newName.value)
-  newName.value = ''
-  if (id) {
-    router.push(`/t/${id}/leaderboard`)
-  }
-}
 
 const startRename = (id: string, name: string) => {
   editingId.value = id
@@ -74,10 +64,9 @@ const handleLogout = async () => {
       </div>
     </div>
 
-    <form class="mb-6 space-y-3" @submit.prevent="createTournament">
-      <input v-model="newName" class="input" placeholder="New tournament name" />
-      <button class="btn btn-primary w-full" type="submit">Create tournament</button>
-    </form>
+    <RouterLink to="/create-tournament" class="btn btn-primary w-full mb-6">
+      Create tournament
+    </RouterLink>
 
     <div class="mb-4 flex items-center justify-between">
       <h2 class="section-title">Tournaments</h2>
