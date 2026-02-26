@@ -43,6 +43,7 @@ export type TournamentStats = {
   trackMaster?: { player: Player; track: string; avgFinish: number }
   uniqueTracks: number
   mostImproved?: { player: Player; improvement: number }
+  blueShellVictim?: { player: Player; secondPlaces: number; total: number }
 }
 
 export function getLeaderboard(tournament: Tournament): LeaderboardEntry[] {
@@ -299,6 +300,26 @@ export function getTournamentStats(tournament: Tournament): TournamentStats {
   // Track variety
   const uniqueTracks = trackCounts.size
 
+  // Blue Shell Victim (most 2nd place finishes)
+  let blueShellVictim: TournamentStats['blueShellVictim']
+  tournament.players.forEach((player) => {
+    let secondPlaces = 0
+    let totalRaces = 0
+    races.forEach((race) => {
+      const finish = getPlayerFinish(race, player.id)
+      if (!finish) return
+      totalRaces += 1
+      if (finish.rank === 2) {
+        secondPlaces += 1
+      }
+    })
+    if (totalRaces > 0 && secondPlaces > 0) {
+      if (!blueShellVictim || secondPlaces > blueShellVictim.secondPlaces) {
+        blueShellVictim = { player, secondPlaces, total: totalRaces }
+      }
+    }
+  })
+
   // Most improved (biggest gain in standings over last 5 races)
   let mostImproved: TournamentStats['mostImproved']
   if (races.length >= 10) {
@@ -350,6 +371,7 @@ export function getTournamentStats(tournament: Tournament): TournamentStats {
     trackMaster,
     uniqueTracks,
     mostImproved,
+    blueShellVictim,
   }
 }
 

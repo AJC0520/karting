@@ -105,39 +105,25 @@ const longestStreak = computed(() => {
             label: 'Most consistent',
             value: stats.mostConsistent?.player.name ?? '—',
             helper: stats.mostConsistent ? `${stats.mostConsistent.gap} position gap` : undefined,
+            description: 'Player with the smallest gap between their best and worst finishing positions',
           },
           {
             label: 'Podium king',
             value: stats.podiumKing?.player.name ?? '—',
             helper: stats.podiumKing ? `${formatNumber(stats.podiumKing.percentage, 1)}% podiums` : undefined,
+            description: 'Player with the highest percentage of podium finishes (top 3 positions)',
           },
           {
             label: 'Average points per race',
             value: stats.avgPointsPerRace?.player.name ?? '—',
             helper: stats.avgPointsPerRace ? `${formatNumber(stats.avgPointsPerRace.avgPoints, 1)} pts/race` : undefined,
-          },
-        ]"
-      />
-      
-      <div class="mt-6 flex items-center justify-between">
-        <h3 class="section-title">Improvement & mastery</h3>
-      </div>
-      <StatsCards
-        :items="[
-          {
-            label: 'Biggest comeback',
-            value: stats.biggestComeback?.player.name ?? '—',
-            helper: stats.biggestComeback ? `${formatNumber(stats.biggestComeback.firstAvg, 1)} → ${formatNumber(stats.biggestComeback.lastAvg, 1)} avg finish` : undefined,
+            description: 'Player with the highest average points scored per race',
           },
           {
-            label: 'Most improved',
-            value: stats.mostImproved?.player.name ?? '—',
-            helper: stats.mostImproved ? `+${stats.mostImproved.improvement} position${stats.mostImproved.improvement > 1 ? 's' : ''} in standings` : undefined,
-          },
-          {
-            label: 'Track master',
-            value: stats.trackMaster?.player.name ?? '—',
-            helper: stats.trackMaster ? `${stats.trackMaster.track} (avg: ${formatNumber(stats.trackMaster.avgFinish, 1)})` : undefined,
+            label: 'Blue Shell Victim',
+            value: stats.blueShellVictim?.player.name ?? '—',
+            helper: stats.blueShellVictim ? `${stats.blueShellVictim.secondPlaces} second places` : undefined,
+            description: 'Player with the most 2nd place finishes (so close!)',
           },
         ]"
       />
