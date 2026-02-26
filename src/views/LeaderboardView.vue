@@ -32,12 +32,23 @@ const podiumOrder = computed(() => {
   return [top[1], top[0], top[2], top[3]] // 2nd, 1st, 3rd, 4th
 })
 
-const getPodiumHeight = (rank: number) => {
-  if (rank === 1) return 'h-48'
-  if (rank === 2) return 'h-36'
-  if (rank === 3) return 'h-28'
-  if (rank === 4) return 'h-20'
-  return 'h-32'
+const podiumScale = computed(() => {
+  const entries = topFour.value
+  if (entries.length === 0) return { minPoints: 0, maxPoints: 0 }
+  const points = entries.map((entry) => entry.totalPoints)
+  return {
+    minPoints: Math.min(...points),
+    maxPoints: Math.max(...points),
+  }
+})
+
+const getPodiumHeight = (points: number) => {
+  const minHeight = 80
+  const maxHeight = 200
+  const { minPoints, maxPoints } = podiumScale.value
+  if (maxPoints === minPoints) return maxHeight
+  const ratio = (points - minPoints) / (maxPoints - minPoints)
+  return Math.round(minHeight + ratio * (maxHeight - minHeight))
 }
 
 const getRankColor = (rank: number) => {
@@ -119,7 +130,8 @@ const longestStreak = computed(() => {
           <!-- Podium Block -->
           <div 
             class="w-full rounded-t-lg flex flex-col items-center justify-center transition-all"
-            :class="[getPodiumHeight(entry.rank), getRankColor(entry.rank)]"
+            :class="getRankColor(entry.rank)"
+            :style="{ height: `${getPodiumHeight(entry.totalPoints)}px` }"
           >
             <div class="text-3xl font-bold">{{ entry.rank }}</div>
           </div>
