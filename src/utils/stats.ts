@@ -40,10 +40,7 @@ export type TournamentStats = {
   mostConsistent?: { player: Player; gap: number }
   podiumKing?: { player: Player; percentage: number; podiums: number; total: number }
   avgPointsPerRace?: { player: Player; avgPoints: number }
-  biggestComeback?: { player: Player; improvement: number; firstAvg: number; lastAvg: number }
-  trackMaster?: { player: Player; track: string; avgFinish: number }
   uniqueTracks: number
-  mostImproved?: { player: Player; improvement: number }
   firstLoser?: { player: Player; secondPlaces: number; total: number }
   mostBlueShellBonuses?: { player: Player; bonuses: number; total: number }
 }
@@ -254,58 +251,6 @@ export function getTournamentStats(tournament: Tournament): TournamentStats {
     }
   })
 
-  // Biggest comeback (improvement from first 5 to last 5 races)
-  let biggestComeback: TournamentStats['biggestComeback']
-  tournament.players.forEach((player) => {
-    const playerRaces = races.filter((race) => race.placements.includes(player.id))
-    if (playerRaces.length < 10) return // Need at least 10 races
-    const first5 = playerRaces.slice(0, 5)
-    const last5 = playerRaces.slice(-5)
-
-    let firstTotal = 0
-    first5.forEach((race) => {
-      const finish = getPlayerFinish(race, player.id)
-      if (finish) firstTotal += finish.rank
-    })
-    const firstAvg = firstTotal / first5.length
-
-    let lastTotal = 0
-    last5.forEach((race) => {
-      const finish = getPlayerFinish(race, player.id)
-      if (finish) lastTotal += finish.rank
-    })
-    const lastAvg = lastTotal / last5.length
-
-    const improvement = firstAvg - lastAvg // Positive means improved (lower finish is better)
-    if (improvement > 0 && (!biggestComeback || improvement > biggestComeback.improvement)) {
-      biggestComeback = { player, improvement, firstAvg, lastAvg }
-    }
-  })
-
-  // Track master (best average finish on their best track)
-  let trackMaster: TournamentStats['trackMaster']
-  tournament.players.forEach((player) => {
-    const trackPerformance = new Map<string, { total: number; count: number }>()
-    races.forEach((race) => {
-      const finish = getPlayerFinish(race, player.id)
-      if (!finish) return
-      const key = race.track.trim().toLowerCase()
-      const entry = trackPerformance.get(key) ?? { total: 0, count: 0 }
-      entry.total += finish.rank
-      entry.count += 1
-      trackPerformance.set(key, entry)
-    })
-
-    trackPerformance.forEach((perf, trackKey) => {
-      if (perf.count < 2) return // Need at least 2 races on track
-      const avgFinish = perf.total / perf.count
-      if (!trackMaster || avgFinish < trackMaster.avgFinish) {
-        const track = races.find((r) => r.track.trim().toLowerCase() === trackKey)?.track ?? trackKey
-        trackMaster = { player, track, avgFinish }
-      }
-    })
-  })
-
   // Track variety
   const uniqueTracks = trackCounts.size
 
@@ -351,44 +296,6 @@ export function getTournamentStats(tournament: Tournament): TournamentStats {
     })
   }
 
-  // Most improved (biggest gain in standings over last 5 races)
-  let mostImproved: TournamentStats['mostImproved']
-  if (races.length >= 10) {
-    const midPoint = Math.floor(races.length / 2)
-    const firstHalfRaces = races.slice(0, midPoint)
-    const secondHalfRaces = races.slice(midPoint)
-
-    const getStandingsAfterRaces = (racesToConsider: Race[]): Map<ID, number> => {
-      const standings = new Map<ID, number>()
-      tournament.players.forEach((player) => {
-        const initialPoints = player.initialPoints ?? tournament.settings.initialPoints
-        let total = initialPoints
-        racesToConsider.forEach((race) => {
-          total += pointsByRace.get(race.id)?.[player.id] ?? 0
-        })
-        standings.set(player.id, total)
-      })
-      return standings
-    }
-
-    const getRank = (standings: Map<ID, number>, playerId: ID): number => {
-      const sorted = [...standings.entries()].sort((a, b) => b[1] - a[1])
-      return sorted.findIndex(([id]) => id === playerId) + 1
-    }
-
-    const firstHalfStandings = getStandingsAfterRaces(firstHalfRaces)
-    const secondHalfStandings = getStandingsAfterRaces(races)
-
-    tournament.players.forEach((player) => {
-      const firstRank = getRank(firstHalfStandings, player.id)
-      const secondRank = getRank(secondHalfStandings, player.id)
-      const improvement = firstRank - secondRank // Positive means improved
-      if (improvement > 0 && (!mostImproved || improvement > mostImproved.improvement)) {
-        mostImproved = { player, improvement }
-      }
-    })
-  }
-
   return {
     totalRaces: races.length,
     mostPlayedTrack,
@@ -398,10 +305,7 @@ export function getTournamentStats(tournament: Tournament): TournamentStats {
     mostConsistent,
     podiumKing,
     avgPointsPerRace,
-    biggestComeback,
-    trackMaster,
     uniqueTracks,
-    mostImproved,
     firstLoser,
     mostBlueShellBonuses,
   }
