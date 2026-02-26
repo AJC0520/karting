@@ -7,6 +7,8 @@ export function computeRacePoints(tournament: Tournament, race: Race): PointsMap
   const placements = race.placements
   const statusMap = race.status ?? {}
   const manualPoints = race.manualPoints ?? {}
+  const blueShells = race.blueShells ?? []
+  const blueShellBonus = tournament.settings.blueShellBonus ?? false
 
   const rankMap: Record<ID, number> = {}
   if (race.rankByPlayer) {
@@ -54,6 +56,16 @@ export function computeRacePoints(tournament: Tournament, race: Race): PointsMap
         points[playerId] = Number(manualPoints[playerId])
       } else {
         points[playerId] = fallbackValue
+      }
+    })
+  }
+
+  // Apply blue shell bonus
+  if (blueShellBonus) {
+    blueShells.forEach((playerId) => {
+      // Only award bonus if player finished 1st and has points already calculated
+      if (rankMap[playerId] === 1 && points[playerId] !== undefined) {
+        points[playerId] = (points[playerId] || 0) + 1
       }
     })
   }

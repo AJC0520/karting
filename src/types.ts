@@ -18,6 +18,7 @@ export type TournamentSettings = {
   initialPoints: number
   pointsByPlacement: number[]
   tieHandling: 'split' | 'manual'
+  blueShellBonus?: boolean
 }
 
 export type Player = {
@@ -41,6 +42,7 @@ export type Race = {
   status?: Record<ID, RaceStatus>
   rankByPlayer?: Record<ID, number>
   manualPoints?: Record<ID, number>
+  blueShells?: ID[] // Players who got hit by blue shell but still won
 }
 
 export type StoredSchemaV1 = {

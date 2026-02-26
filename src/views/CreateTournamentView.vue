@@ -10,6 +10,7 @@ const router = useRouter()
 const tournamentName = ref('')
 const newPlayerName = ref('')
 const newPlayerNickname = ref('')
+const blueShellBonus = ref(false)
 
 type TempPlayer = {
   id: string
@@ -42,7 +43,7 @@ const removePlayer = (id: string) => {
 const createTournament = async () => {
   if (!canSubmit.value) return
   
-  const tournamentId = await store.createTournament(tournamentName.value.trim())
+  const tournamentId = await store.createTournament(tournamentName.value.trim(), blueShellBonus.value)
   
   if (tournamentId) {
     // Add all players to the tournament
@@ -83,6 +84,19 @@ const cancel = () => {
           placeholder="e.g. Summer Championship 2024"
           autofocus
         />
+      </div>
+
+      <div class="flex items-start gap-3">
+        <input 
+          v-model="blueShellBonus" 
+          type="checkbox" 
+          id="blueShellBonus"
+          class="mt-1 w-4 h-4 rounded border-zinc-300 text-primary focus:ring-primary"
+        />
+        <label for="blueShellBonus" class="flex-1 cursor-pointer">
+          <div class="text-sm font-semibold">Enable Blue Shell Bonus</div>
+          <p class="text-xs text-muted mt-1">If enabled, players who get hit by a blue shell but still win the race will get an extra point.</p>
+        </label>
       </div>
 
       <div class="border-t border-black/5 pt-6">

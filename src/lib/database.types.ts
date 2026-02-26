@@ -36,6 +36,7 @@ export interface Database {
           initial_points: number
           points_by_placement: Json
           tie_handling: string
+          blue_shell_bonus: boolean | null
         }
         Insert: {
           id?: string
@@ -46,6 +47,7 @@ export interface Database {
           initial_points: number
           points_by_placement: Json
           tie_handling: string
+          blue_shell_bonus?: boolean | null
         }
         Update: {
           id?: string
@@ -56,6 +58,7 @@ export interface Database {
           initial_points?: number
           points_by_placement?: Json
           tie_handling?: string
+          blue_shell_bonus?: boolean | null
         }
       }
       players: {
@@ -98,6 +101,7 @@ export interface Database {
           status: Json | null
           rank_by_player: Json | null
           manual_points: Json | null
+          blue_shells: Json | null
         }
         Insert: {
           id?: string
@@ -109,6 +113,7 @@ export interface Database {
           status?: Json | null
           rank_by_player?: Json | null
           manual_points?: Json | null
+          blue_shells?: Json | null
         }
         Update: {
           id?: string
@@ -120,6 +125,7 @@ export interface Database {
           status?: Json | null
           rank_by_player?: Json | null
           manual_points?: Json | null
+          blue_shells?: Json | null
         }
       }
     }

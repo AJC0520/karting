@@ -21,8 +21,10 @@ const track = ref('')
 const timestamp = ref('')
 const notes = ref('')
 const positionMap = ref<Record<string, number | null>>({})
+const blueShells = ref<Set<string>>(new Set())
 
-const activePlayers = computed(() => props.tournament.players.filter((player) => !player.archived))
+const activePlayers = computed(() => props.tournament.players)
+const blueShellEnabled = computed(() => props.tournament.settings.blueShellBonus ?? false)
 
 const validationError = computed(() => {
   if (!track.value.trim()) return 'Track name is required.'
@@ -59,6 +61,9 @@ const resetState = () => {
       positionMap.value[player.id] = null
     })
   }
+  
+  // Initialize blue shells from race data
+  blueShells.value = new Set(props.race?.blueShells ?? [])
 }
 
 watch(
@@ -78,6 +83,14 @@ const handlePositionInput = (playerId: string, value: string) => {
     positionMap.value[playerId] = null
   } else {
     positionMap.value[playerId] = Math.max(1, Math.min(24, num))
+  }
+}
+
+const toggleBlueShell = (playerId: string) => {
+  if (blueShells.value.has(playerId)) {
+    blueShells.value.delete(playerId)
+  } else {
+    blueShells.value.add(playerId)
   }
 }
 
@@ -116,6 +129,7 @@ const saveRace = () => {
     status: undefined,
     rankByPlayer,
     manualPoints: undefined,
+    blueShells: blueShells.value.size > 0 ? Array.from(blueShells.value) : undefined,
   }
 
   emit('save', payload)
@@ -151,15 +165,31 @@ const saveRace = () => {
             <p class="font-semibold">{{ player.name }}</p>
             <p v-if="player.nickname" class="text-xs text-muted">{{ player.nickname }}</p>
           </div>
-          <input
-            :value="positionMap[player.id] ?? ''"
-            class="input w-20 text-center"
-            type="number"
-            min="1"
-            max="24"
-            placeholder="—"
-            @input="handlePositionInput(player.id, ($event.target as HTMLInputElement).value)"
-          />
+          <div class="flex items-center gap-2">
+            <button
+              v-if="blueShellEnabled && positionMap[player.id] === 1"
+              type="button"
+              @click="toggleBlueShell(player.id)"
+              :class="[
+                'w-8 h-8 rounded flex items-center justify-center transition-all',
+                blueShells.has(player.id)
+                  ? 'bg-blue-100 border-2 border-blue-500'
+                  : 'bg-zinc-100 border border-zinc-300 hover:bg-zinc-200'
+              ]"
+              :title="blueShells.has(player.id) ? 'Blue shell bonus active' : 'Click if hit by blue shell but won'"
+            >
+              <img src="/blue_shell.png" alt="Blue Shell" class="w-5 h-5" />
+            </button>
+            <input
+              :value="positionMap[player.id] ?? ''"
+              class="input w-20 text-center"
+              type="number"
+              min="1"
+              max="24"
+              placeholder="—"
+              @input="handlePositionInput(player.id, ($event.target as HTMLInputElement).value)"
+            />
+          </div>
         </div>
       </div>
     </div>

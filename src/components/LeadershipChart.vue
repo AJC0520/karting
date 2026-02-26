@@ -112,6 +112,32 @@ const leadershipSegments = computed(() => {
   return segments
 })
 
+// Track leadership changes for labels
+const leadershipChanges = computed(() => {
+  const changes: Array<{
+    raceIndex: number
+    position: number
+    newLeader: string
+    previousLeader: string
+  }> = []
+  
+  for (let i = 1; i < leadershipHistory.value.length; i++) {
+    const current = leadershipHistory.value[i]
+    const previous = leadershipHistory.value[i - 1]
+    
+    if (current.playerId !== previous.playerId) {
+      changes.push({
+        raceIndex: i,
+        position: (i / totalRaces.value) * 100,
+        newLeader: current.playerName,
+        previousLeader: previous.playerName
+      })
+    }
+  }
+  
+  return changes
+})
+
 const totalRaces = computed(() => leadershipHistory.value.length)
 
 const getSegmentWidth = (segment: { start: number; end: number }) => {
@@ -149,6 +175,29 @@ const getSegmentPosition = (segment: { start: number }) => {
           <span v-if="getSegmentWidth(segment) > 10" class="truncate px-2">
             {{ segment.player }}
           </span>
+        </div>
+        
+        <!-- Leadership change markers -->
+        <div
+          v-for="(change, index) in leadershipChanges"
+          :key="`change-${index}`"
+          class="absolute top-0 bottom-0 w-0.5 bg-white/50"
+          :style="{ left: `${change.position}%` }"
+        ></div>
+      </div>
+      
+      <!-- Leadership change labels -->
+      <div class="relative h-8 -mt-2">
+        <div
+          v-for="(change, index) in leadershipChanges"
+          :key="`label-${index}`"
+          class="absolute transform -translate-x-1/2 text-xs bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-600 rounded px-2 py-1 whitespace-nowrap shadow-sm"
+          :style="{ left: `${change.position}%` }"
+          :title="`After race ${change.raceIndex + 1}`"
+        >
+          <span class="font-semibold text-green-600 dark:text-green-400">{{ change.newLeader }}</span>
+          <span class="text-muted"> overtakes </span>
+          <span class="font-semibold text-red-600 dark:text-red-400">{{ change.previousLeader }}</span>
         </div>
       </div>
       

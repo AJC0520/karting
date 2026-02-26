@@ -82,6 +82,7 @@ export const useAppStore = defineStore('app', {
             initialPoints: t.initial_points,
             pointsByPlacement: t.points_by_placement as number[],
             tieHandling: t.tie_handling as 'split' | 'manual',
+            blueShellBonus: t.blue_shell_bonus ?? false,
           },
           players: (playersData || [])
             .filter(p => p.tournament_id === t.id)
@@ -105,6 +106,7 @@ export const useAppStore = defineStore('app', {
               status: r.status as Record<string, 'ok' | 'dnf' | 'dq'> | undefined,
               rankByPlayer: r.rank_by_player as Record<string, number> | undefined,
               manualPoints: r.manual_points as Record<string, number> | undefined,
+              blueShells: r.blue_shells as string[] | undefined,
             })),
         }))
       } catch (error: any) {
@@ -115,7 +117,7 @@ export const useAppStore = defineStore('app', {
       }
     },
 
-    async createTournament(name: string): Promise<string | null> {
+    async createTournament(name: string, blueShellBonus: boolean = false): Promise<string | null> {
       const authStore = useAuthStore()
       if (!authStore.user) return null
 
@@ -133,6 +135,7 @@ export const useAppStore = defineStore('app', {
           initial_points: settings.initialPoints,
           points_by_placement: settings.pointsByPlacement,
           tie_handling: settings.tieHandling,
+          blue_shell_bonus: blueShellBonus,
         })
 
         if (error) throw error
@@ -143,7 +146,10 @@ export const useAppStore = defineStore('app', {
           name: name.trim() || 'New tournament',
           createdAt: now,
           updatedAt: now,
-          settings,
+          settings: {
+            ...settings,
+            blueShellBonus,
+          },
           players: [],
           races: [],
         }
@@ -316,36 +322,6 @@ export const useAppStore = defineStore('app', {
       }
     },
 
-    async archivePlayer(tournamentId: string, playerId: string, archived: boolean): Promise<void> {
-      const tournament = this.tournaments.find((item) => item.id === tournamentId)
-      if (!tournament) return
-      const player = tournament.players.find((item) => item.id === playerId)
-      if (!player) return
-
-      const now = new Date().toISOString()
-
-      try {
-        const { error } = await supabase
-          .from('players')
-          .update({ archived })
-          .eq('id', playerId)
-
-        if (error) throw error
-
-        // Update tournament updated_at
-        await supabase
-          .from('tournaments')
-          .update({ updated_at: now })
-          .eq('id', tournamentId)
-
-        player.archived = archived
-        tournament.updatedAt = now
-      } catch (error: any) {
-        this.error = error.message
-        console.error('Failed to archive player:', error)
-      }
-    },
-
     async removePlayer(tournamentId: string, playerId: string): Promise<boolean> {
       const tournament = this.tournaments.find((item) => item.id === tournamentId)
       if (!tournament) return false
@@ -389,6 +365,7 @@ async addRace(tournamentId: string, race: Race): Promise<string | null> {
           status: race.status || null,
           rank_by_player: race.rankByPlayer || null,
           manual_points: race.manualPoints || null,
+          blue_shells: race.blueShells || null,
         })
 
         if (error) throw error
@@ -428,6 +405,7 @@ async addRace(tournamentId: string, race: Race): Promise<string | null> {
             status: updates.status || null,
             rank_by_player: updates.rankByPlayer || null,
             manual_points: updates.manualPoints || null,
+            blue_shells: updates.blueShells || null,
           })
           .eq('id', raceId)
 

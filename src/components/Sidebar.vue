@@ -54,7 +54,7 @@ const handleLogout = async () => {
 <template>
   <aside class="w-full border-b border-black/5 bg-surface/95 p-4 lg:w-72 lg:border-b-0 lg:border-r">
     <div class="mb-6">
-      <p class="text-xs uppercase tracking-[0.3em] text-muted">Mario Kart</p>
+      <h1 class="text-2xl font-semibold">Mario Kart</h1>
       <h1 class="text-2xl font-semibold">Tournament Tracker</h1>
       <div v-if="authStore.userEmail" class="mt-2 flex items-center justify-between text-xs text-muted">
         <span>{{ authStore.userEmail }}</span>

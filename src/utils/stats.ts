@@ -28,6 +28,7 @@ export type PlayerStats = {
   recentForm: PlayerFormEntry[]
   currentWinStreak: number
   longestWinStreak: number
+  blueShellBonuses: number
 }
 
 export type TournamentStats = {
@@ -43,7 +44,8 @@ export type TournamentStats = {
   trackMaster?: { player: Player; track: string; avgFinish: number }
   uniqueTracks: number
   mostImproved?: { player: Player; improvement: number }
-  blueShellVictim?: { player: Player; secondPlaces: number; total: number }
+  firstLoser?: { player: Player; secondPlaces: number; total: number }
+  mostBlueShellBonuses?: { player: Player; bonuses: number; total: number }
 }
 
 export function getLeaderboard(tournament: Tournament): LeaderboardEntry[] {
@@ -101,6 +103,7 @@ export function getPlayerStats(tournament: Tournament, playerId: ID): PlayerStat
   let totalFinish = 0
   let bestFinish = Number.POSITIVE_INFINITY
   let worstFinish = 0
+  let blueShellBonuses = 0
 
   const recentForm: PlayerFormEntry[] = []
 
@@ -118,6 +121,11 @@ export function getPlayerStats(tournament: Tournament, playerId: ID): PlayerStat
     }
     if (finish.rank <= 3 && finish.status === 'ok') {
       podiums += 1
+    }
+    
+    // Count blue shell bonuses
+    if (race.blueShells && race.blueShells.includes(playerId)) {
+      blueShellBonuses += 1
     }
   })
 
@@ -150,6 +158,7 @@ export function getPlayerStats(tournament: Tournament, playerId: ID): PlayerStat
     recentForm,
     currentWinStreak: current,
     longestWinStreak: longest,
+    blueShellBonuses,
   }
 }
 
@@ -300,8 +309,8 @@ export function getTournamentStats(tournament: Tournament): TournamentStats {
   // Track variety
   const uniqueTracks = trackCounts.size
 
-  // Blue Shell Victim (most 2nd place finishes)
-  let blueShellVictim: TournamentStats['blueShellVictim']
+  // 1st loser (most 2nd place finishes)
+  let firstLoser: TournamentStats['firstLoser']
   tournament.players.forEach((player) => {
     let secondPlaces = 0
     let totalRaces = 0
@@ -314,11 +323,33 @@ export function getTournamentStats(tournament: Tournament): TournamentStats {
       }
     })
     if (totalRaces > 0 && secondPlaces > 0) {
-      if (!blueShellVictim || secondPlaces > blueShellVictim.secondPlaces) {
-        blueShellVictim = { player, secondPlaces, total: totalRaces }
+      if (!firstLoser || secondPlaces > firstLoser.secondPlaces) {
+        firstLoser = { player, secondPlaces, total: totalRaces }
       }
     }
   })
+
+  // Most Blue Shell Bonuses (earned the most blue shell bonus points)
+  let mostBlueShellBonuses: TournamentStats['mostBlueShellBonuses']
+  if (tournament.settings.blueShellBonus) {
+    tournament.players.forEach((player) => {
+      let bonuses = 0
+      let totalRaces = 0
+      races.forEach((race) => {
+        if (race.placements.includes(player.id)) {
+          totalRaces += 1
+          if (race.blueShells && race.blueShells.includes(player.id)) {
+            bonuses += 1
+          }
+        }
+      })
+      if (bonuses > 0) {
+        if (!mostBlueShellBonuses || bonuses > mostBlueShellBonuses.bonuses) {
+          mostBlueShellBonuses = { player, bonuses, total: totalRaces }
+        }
+      }
+    })
+  }
 
   // Most improved (biggest gain in standings over last 5 races)
   let mostImproved: TournamentStats['mostImproved']
@@ -371,7 +402,8 @@ export function getTournamentStats(tournament: Tournament): TournamentStats {
     trackMaster,
     uniqueTracks,
     mostImproved,
-    blueShellVictim,
+    firstLoser,
+    mostBlueShellBonuses,
   }
 }
 
@@ -514,3 +546,4 @@ export function getTrackStats(tournament: Tournament, trackName: string): TrackS
     lastPlayed: races[races.length - 1]?.timestamp,
   }
 }
+

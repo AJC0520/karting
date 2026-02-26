@@ -14,13 +14,12 @@ const route = useRoute()
 const store = useAppStore()
 
 const tournament = computed(() => store.getTournamentById(route.params.id as string))
-const showArchived = ref(false)
 const editingPlayer = ref<Player | null>(null)
 const selectedPlayerId = ref<string | null>(null)
 
 const visiblePlayers = computed(() => {
   if (!tournament.value) return []
-  return tournament.value.players.filter((player) => (showArchived.value ? true : !player.archived))
+  return tournament.value.players
 })
 
 const selectPlayer = (player: Player) => {
@@ -59,11 +58,6 @@ const updatePlayer = (payload: { name: string; nickname?: string; initialPoints?
   if (!tournament.value || !editingPlayer.value) return
   store.updatePlayer(tournament.value.id, editingPlayer.value.id, payload)
   editingPlayer.value = null
-}
-
-const archivePlayer = (player: Player, archived: boolean) => {
-  if (!tournament.value) return
-  store.archivePlayer(tournament.value.id, player.id, archived)
 }
 
 const removePlayer = (player: Player) => {
@@ -108,34 +102,25 @@ const removePlayer = (player: Player) => {
       </div>
     </div>
 
-    <div class="flex items-center gap-3">
-      <label class="flex items-center gap-2 text-sm">
-        <input v-model="showArchived" type="checkbox" />
-        Show archived players
-      </label>
-    </div>
-
     <div class="card p-4">
       <div class="grid grid-cols-12 gap-2 border-b border-black/5 px-2 py-3 text-xs font-semibold uppercase text-muted">
-        <span class="col-span-4">Player</span>
+        <span class="col-span-5">Player</span>
         <span class="col-span-2">Initial</span>
-        <span class="col-span-2">Status</span>
-        <span class="col-span-4 text-right">Actions</span>
+        <span class="col-span-5 text-right">Actions</span>
       </div>
       <div
         v-for="player in visiblePlayers"
         :key="player.id"
         class="grid grid-cols-12 gap-2 border-b border-black/5 px-2 py-3 text-sm last:border-b-0"
       >
-        <button class="col-span-4 text-left font-semibold hover:text-primary" @click="selectPlayer(player)">
+        <button class="col-span-5 text-left font-semibold hover:text-primary" @click="selectPlayer(player)">
           {{ player.name }}
           <span v-if="player.nickname" class="text-xs text-muted">({{ player.nickname }})</span>
         </button>
         <span class="col-span-2 text-muted">
           {{ player.initialPoints ?? tournament.settings.initialPoints }}
         </span>
-        <span class="col-span-2 text-muted">{{ player.archived ? 'Archived' : 'Active' }}</span>
-        <div class="col-span-4 flex justify-end gap-2">
+        <div class="col-span-5 flex justify-end gap-2">
           <button class="btn btn-ghost text-xs" type="button" @click="startEdit(player)">Edit</button>
           <button
             v-if="!hasHistory(player.id)"
@@ -144,14 +129,6 @@ const removePlayer = (player: Player) => {
             @click="removePlayer(player)"
           >
             Delete
-          </button>
-          <button
-            v-else
-            class="btn btn-ghost text-xs"
-            type="button"
-            @click="archivePlayer(player, !player.archived)"
-          >
-            {{ player.archived ? 'Unarchive' : 'Archive' }}
           </button>
         </div>
       </div>
@@ -165,7 +142,10 @@ const removePlayer = (player: Player) => {
           { label: 'Podiums', value: playerStats.podiums },
           { label: 'Average finish', value: formatNumber(playerStats.avgFinish, 2) },
           { label: 'Total races', value: playerStats.totalRaces },
-        ]"
+        ].concat(tournament.settings.blueShellBonus && playerStats.blueShellBonuses > 0 ? [{
+          label: 'Blue Shell Bonuses',
+          value: playerStats.blueShellBonuses,
+        }] : [])"
       />
       <div class="grid gap-4 md:grid-cols-2">
         <div class="card p-4">
