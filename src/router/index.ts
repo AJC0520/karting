@@ -10,6 +10,7 @@ import PlayersView from '@/views/PlayersView.vue'
 import MapView from '@/views/MapView.vue'
 import LoginView from '@/views/LoginView.vue'
 import SignupView from '@/views/SignupView.vue'
+import BeerikartView from '@/views/BeerikartView.vue'
 
 export const routes: RouteRecordRaw[] = [
   {
@@ -40,6 +41,12 @@ export const routes: RouteRecordRaw[] = [
     path: '/create-tournament',
     name: 'create-tournament',
     component: CreateTournamentView,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/beeriokart',
+    name: 'beeriokart',
+    component: BeerikartView,
     meta: { requiresAuth: true },
   },
   {

@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 
 import { useAppStore } from '@/stores/appStore'
 import { useAuthStore } from '@/stores/authStore'
+import { CircleQuestionMarkIcon, Home } from 'lucide-vue-next'
 
 const store = useAppStore()
 const authStore = useAuthStore()
@@ -58,16 +59,15 @@ const handleLogout = async () => {
         to="/"
         class="inline-flex items-center gap-2 rounded-xl border border-black/10 bg-white/90 px-4 py-2.5 text-sm font-semibold text-ink shadow-sm transition hover:shadow-md"
       >
-        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M3 10.5L12 3l9 7.5M5 9.5V21h14V9.5" />
-        </svg>
-        Home
+        <Home></Home>
+        Home  
       </RouterLink>
       <RouterLink
         to="/how-to-use"
         class="inline-flex items-center gap-2 rounded-xl border border-black/10 bg-white/90 px-4 py-2.5 text-sm font-semibold text-ink shadow-sm transition hover:shadow-md"
       >
-        ? How to use
+        <CircleQuestionMarkIcon></CircleQuestionMarkIcon>
+        How to use  
       </RouterLink>
     </div>
 
@@ -82,8 +82,12 @@ const handleLogout = async () => {
       </div>
     </div>
 
-    <RouterLink to="/create-tournament" class="btn btn-primary w-full mb-6">
+    <RouterLink to="/create-tournament" class="btn btn-primary w-full mb-4">
       Create tournament
+    </RouterLink>
+
+    <RouterLink to="/beeriokart" class="btn btn-accent w-full mb-6">
+      🍺 Beeriokart
     </RouterLink>
 
     <div class="mb-4 flex items-center justify-between">
