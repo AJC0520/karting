@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import type { Tournament, ID } from '@/types'
 import { getLeaderboard } from '@/utils/stats'
+import { formatNumber } from '@/utils/format'
 
 const props = defineProps<{
   tournament: Tournament
@@ -258,6 +259,42 @@ const xAxisLabels = computed(() => {
   return labels
 })
 
+const largestGap = computed(() => {
+  let maxGap = -1
+  let maxIndex = -1
+  let leaderPoints = 0
+  let lastPoints = 0
+
+  racesSorted.value.forEach((race, raceIndex) => {
+    const partialTournament = {
+      ...props.tournament,
+      races: racesSorted.value.slice(0, raceIndex + 1)
+    }
+    const leaderboard = getLeaderboard(partialTournament)
+    if (!leaderboard.length) return
+    const leader = leaderboard[0]
+    const last = leaderboard[leaderboard.length - 1]
+    const gap = leader.totalPoints - last.totalPoints
+    if (gap > maxGap) {
+      maxGap = gap
+      maxIndex = raceIndex
+      leaderPoints = leader.totalPoints
+      lastPoints = last.totalPoints
+    }
+  })
+
+  if (maxIndex === -1) return null
+  const yLeader = getY(leaderPoints)
+  const yLast = getY(lastPoints)
+  return {
+    raceIndex: maxIndex,
+    gap: maxGap,
+    x: getX(maxIndex),
+    yTop: Math.min(yLeader, yLast),
+    yBottom: Math.max(yLeader, yLast),
+  }
+})
+
 // Track leadership changes (when 1st place changes)
 const leadershipChanges = computed(() => {
   const changes: Array<{
@@ -348,6 +385,7 @@ const leadershipChanges = computed(() => {
 const graphContainerRef = ref<HTMLDivElement | null>(null)
 const svgRef = ref<SVGSVGElement | null>(null)
 const hoveredChange = ref<{ left: number; top: number; data: HoveredChange } | null>(null)
+const largestGapTooltip = ref<{ left: number; top: number } | null>(null)
 
 const showTooltip = (change: HoveredChange) => {
   if (!svgRef.value || !graphContainerRef.value) return
@@ -362,6 +400,22 @@ const showTooltip = (change: HoveredChange) => {
 
 const hideTooltip = () => {
   hoveredChange.value = null
+}
+
+const showLargestGapTooltip = () => {
+  if (!largestGap.value || !svgRef.value || !graphContainerRef.value) return
+  const svgRect = svgRef.value.getBoundingClientRect()
+  const containerRect = graphContainerRef.value.getBoundingClientRect()
+  const scaleX = svgRect.width / width
+  const scaleY = svgRect.height / height
+  const left = largestGap.value.x * scaleX + (svgRect.left - containerRect.left)
+  const midY = (largestGap.value.yTop + largestGap.value.yBottom) / 2
+  const top = midY * scaleY + (svgRect.top - containerRect.top)
+  largestGapTooltip.value = { left, top }
+}
+
+const hideLargestGapTooltip = () => {
+  largestGapTooltip.value = null
 }
 </script>
 
@@ -393,6 +447,33 @@ const hideTooltip = () => {
               stroke="currentColor"
               stroke-width="1"
               stroke-dasharray="4 4"
+            />
+          </g>
+
+          <!-- Largest gap marker -->
+          <g v-if="largestGap" class="pointer-events-none">
+            <line
+              :x1="largestGap.x"
+              :y1="largestGap.yTop"
+              :x2="largestGap.x"
+              :y2="largestGap.yBottom"
+              stroke="#f59e0b"
+              stroke-width="2"
+              stroke-dasharray="6 6"
+              opacity="0.6"
+            />
+          </g>
+          <g v-if="largestGap">
+            <line
+              :x1="largestGap.x"
+              :y1="largestGap.yTop"
+              :x2="largestGap.x"
+              :y2="largestGap.yBottom"
+              stroke="transparent"
+              stroke-width="12"
+              class="cursor-pointer"
+              @mouseenter="showLargestGapTooltip"
+              @mouseleave="hideLargestGapTooltip"
             />
           </g>
           
@@ -462,19 +543,6 @@ const hideTooltip = () => {
             v-for="(change, index) in leadershipChanges"
             :key="`change-${index}`"
           >
-            <!-- Vertical line marker -->
-            <line
-              :x1="change.x"
-              :y1="padding.top"
-              :x2="change.x"
-              :y2="height - padding.bottom"
-              stroke="currentColor"
-              stroke-width="1"
-              stroke-dasharray="3 3"
-              class="opacity-30"
-              pointer-events="none"
-            />
-            
             <!-- Hoverable dot marker -->
             <g
               class="cursor-pointer"
@@ -532,6 +600,23 @@ const hideTooltip = () => {
           ></div>
         </div>
       </div>
+
+      <div
+        v-if="largestGap && largestGapTooltip"
+        class="pointer-events-none absolute z-20"
+        :style="{ left: `${largestGapTooltip.left}px`, top: `${largestGapTooltip.top}px` }"
+      >
+        <div class="relative -translate-x-1/2 -translate-y-full -mt-3">
+          <div
+            class="rounded-md border border-amber-200/80 bg-white/95 px-3 py-1.5 text-xs font-semibold text-amber-900 shadow-lg backdrop-blur"
+          >
+            Largest gap: {{ formatNumber(largestGap.gap, 1) }} pts
+          </div>
+          <div
+            class="absolute left-1/2 top-full -translate-x-1/2 -mt-1 h-2 w-2 rotate-45 border-r border-b border-amber-200/80 bg-white/95"
+          ></div>
+        </div>
+      </div>
       
       <!-- Legend positioned over graph -->
       <div class="absolute top-4 left-1/2 transform -translate-x-1/2">
@@ -546,6 +631,21 @@ const hideTooltip = () => {
               :style="{ backgroundColor: player.color }"
             ></div>
             <span class="font-semibold">{{ player.playerName }}</span>
+          </div>
+        </div>
+        <div class="mt-2 flex flex-wrap gap-4 text-xs text-muted justify-center">
+          <div class="flex items-center gap-2">
+            <div class="relative w-4 h-4">
+              <div class="absolute inset-0 rounded-full border-2 border-amber-400/70"></div>
+              <div class="absolute inset-[3px] rounded-full bg-amber-500 border-2 border-white"></div>
+            </div>
+            <span>Overtake dot (new leader color)</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <svg class="h-4 w-4" viewBox="0 0 16 16" fill="none">
+              <line x1="8" y1="2" x2="8" y2="14" stroke="#f59e0b" stroke-width="2" stroke-dasharray="4 4" />
+            </svg>
+            <span>Largest gap between 1st and last</span>
           </div>
         </div>
       </div>
