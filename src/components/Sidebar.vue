@@ -67,11 +67,7 @@ const handleLogout = async () => {
         to="/how-to-use"
         class="inline-flex items-center gap-2 rounded-xl border border-black/10 bg-white/90 px-4 py-2.5 text-sm font-semibold text-ink shadow-sm transition hover:shadow-md"
       >
-        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M9.5 9.1a2.9 2.9 0 1 1 4.9 2.1c-.8.7-1.4 1.3-1.4 2.4" />
-          <path stroke-linecap="round" stroke-linejoin="round" d="M12 17h.01" />
-        </svg>
-        How to use
+        ? How to use
       </RouterLink>
     </div>
 
