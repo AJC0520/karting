@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, nextTick } from 'vue'
 import { Trophy, ArrowDown, ArrowRight, X } from 'lucide-vue-next'
+import BracketLegend from '@/components/BracketLegend.vue'
+import BracketPodium from '@/components/BracketPodium.vue'
+import BracketRaceCard from '@/components/BracketRaceCard.vue'
 
 interface BracketPlayer {
   id: string
@@ -686,47 +689,7 @@ const movePlayerDown = (index: number) => {
         </div>
 
         <!-- Legend -->
-        <div class="bg-slate-50 rounded-lg p-4 border border-slate-200">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <!-- Race Status -->
-            <div class="space-y-2">
-              <p class="text-xs font-semibold text-muted mb-2">Race Status:</p>
-              <div class="flex items-center gap-2">
-                <div class="w-6 h-6 rounded-full bg-amber-100 border border-amber-300 flex items-center justify-center">
-                  <span class="text-amber-600 text-xs">⏱</span>
-                </div>
-                <span class="text-xs text-ink">Ready to be played</span>
-              </div>
-              <div class="flex items-center gap-2">
-                <div class="w-6 h-6 rounded-full bg-green-100 border border-green-300 flex items-center justify-center">
-                  <span class="text-green-600 text-xs">✓</span>
-                </div>
-                <span class="text-xs text-ink">Race is done</span>
-              </div>
-            </div>
-            
-            <!-- Position Colors -->
-            <div class="space-y-2">
-              <p class="text-xs font-semibold text-muted mb-2">Position Colors:</p>
-              <div class="flex items-center gap-2">
-                <div class="w-6 h-4 bg-green-100 border border-green-300 rounded"></div>
-                <span class="text-xs text-ink">Advances to next round</span>
-              </div>
-              <div class="flex items-center gap-2">
-                <div class="w-6 h-4 bg-yellow-100 border border-yellow-300 rounded"></div>
-                <span class="text-xs text-ink">Moves to loser bracket</span>
-              </div>
-              <div class="flex items-center gap-2">
-                <div class="w-6 h-4 bg-red-100 border border-red-300 rounded"></div>
-                <span class="text-xs text-ink">Eliminated from tournament</span>
-              </div>
-              <div class="flex items-center gap-2">
-                <div class="w-6 h-4 bg-slate-100 border border-slate-300 rounded"></div>
-                <span class="text-xs text-ink">Consolation (5-8th place)</span>
-              </div>
-            </div>
-          </div>
-        </div>
+        <BracketLegend />
 
         <div class="space-y-4">
           <!-- Vertical bracket layout in tournament progression order -->
@@ -739,149 +702,32 @@ const movePlayerDown = (index: number) => {
               <h3 class="text-base font-bold text-muted mb-4">{{ round }}</h3>
               
               <!-- Podium for completed Grand finale -->
-              <div v-if="round === 'Grand finale' && grandFinaleResult" class="w-full max-w-4xl mx-auto">
-                <div class="flex items-end justify-center gap-4">
-                  <!-- 2nd Place -->
-                  <div class="flex-1 flex flex-col items-center podium-slide-2">
-                    <div class="text-center mb-4 space-y-2">
-                      <div class="text-4xl font-bold mb-2 text-slate-300">🥈</div>
-                      <p class="font-semibold text-lg">{{ grandFinaleResult[1]?.player?.name }}</p>
-                      <div class="mt-3">
-                        <p class="text-2xl font-bold">2nd</p>
-                      </div>
-                    </div>
-                    <div 
-                      class="w-full h-32 rounded-t-lg flex flex-col items-center justify-center transition-all bg-slate-300 text-slate-950"
-                    >
-                      <div class="text-3xl font-bold">2</div>
-                    </div>
-                  </div>
-                  
-                  <!-- 1st Place -->
-                  <div class="flex-1 flex flex-col items-center podium-slide-1">
-                    <div class="text-center mb-4 space-y-2">
-                      <div class="text-4xl font-bold mb-2 text-amber-400">🥇</div>
-                      <p class="font-semibold text-lg">{{ grandFinaleResult[0]?.player?.name }}</p>
-                      <div class="mt-3">
-                        <p class="text-2xl font-bold">Champion!</p>
-                      </div>
-                    </div>
-                    <div 
-                      class="w-full h-48 rounded-t-lg flex flex-col items-center justify-center transition-all bg-amber-400 text-amber-950"
-                    >
-                      <div class="text-4xl font-bold">1</div>
-                    </div>
-                  </div>
-                  
-                  <!-- 3rd Place -->
-                  <div class="flex-1 flex flex-col items-center podium-slide-3">
-                    <div class="text-center mb-4 space-y-2">
-                      <div class="text-4xl font-bold mb-2 text-orange-600">🥉</div>
-                      <p class="font-semibold text-lg">{{ grandFinaleResult[2]?.player?.name }}</p>
-                      <div class="mt-3">
-                        <p class="text-2xl font-bold">3rd</p>
-                      </div>
-                    </div>
-                    <div 
-                      class="w-full h-20 rounded-t-lg flex flex-col items-center justify-center transition-all bg-orange-600 text-orange-50"
-                    >
-                      <div class="text-2xl font-bold">3</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <BracketPodium v-if="round === 'Grand finale' && grandFinaleResult" :results="grandFinaleResult" />
               
               <div 
                 v-else
                 class="gap-3"
                 :class="round === 'Winner bracket 1' ? 'grid grid-cols-2 max-w-[544px] mx-auto' : 'flex flex-wrap justify-center'"
               >
-                <div
+                <BracketRaceCard
                   v-for="(race, raceIndex) in bracketOverview[round]"
                   :key="race?.id || `placeholder_${round}_${raceIndex}`"
-                  class="w-[260px] rounded-lg border p-2.5"
-                  :class="[
-                    race ? (race.completed ? 'bg-green-200 border-green-400' : 'bg-amber-50 border-amber-300') : 'bg-slate-50/60 border-dashed',
-                    race ? 'cursor-pointer hover:shadow-md transition-shadow' : ''
-                  ]"
-                  @click="race && startEditingRace(race.id)"
-                >
-                  <div class="text-[10px] uppercase mb-1.5 flex items-center justify-between font-semibold"
-                    :class="race ? (race.completed ? 'text-green-700' : 'text-amber-700') : 'text-slate-400'">
-                    <span>Race {{ raceIndex + 1 }}</span>
-                    <span v-if="race?.completed" class="text-green-600 text-sm">✓</span>
-                    <span v-else-if="race" class="text-amber-600 text-sm">⏱</span>
-                  </div>
-
-                  <!-- Editing mode -->
-                  <div v-if="race && editingRaceId === race.id" class="space-y-2" @click.stop>
-                    <div class="text-[9px] text-muted mb-2">Use arrows to swap position</div>
-                    <div
-                      v-for="(playerId, index) in editingPlacements"
-                      :key="playerId"
-                      class="flex items-center gap-1.5 p-1.5 rounded border"
-                      :class="getPositionColor(round, index + 1)"
-                    >
-                      <div class="flex flex-col gap-0.5">
-                        <button
-                          @click="movePlayerUp(index)"
-                          class="text-[9px] hover:opacity-70"
-                          :disabled="index === 0"
-                          :class="{ 'opacity-30': index === 0 }"
-                        >
-                          ▲
-                        </button>
-                        <button
-                          @click="movePlayerDown(index)"
-                          class="text-[9px] hover:opacity-70"
-                          :disabled="index === editingPlacements.length - 1"
-                          :class="{ 'opacity-30': index === editingPlacements.length - 1 }"
-                        >
-                          ▼
-                        </button>
-                      </div>
-                      <div class="font-bold text-xs w-5 text-center">
-                        {{ index + 1 }}.
-                      </div>
-                      <span class="text-xs font-semibold truncate flex-1">{{ getPlayerById(playerId)?.name }}</span>
-                      <ArrowRight v-if="shouldShowIndicator(round, index + 1) && getPositionIndicator(round, index + 1).type === 'icon' && getPositionIndicator(round, index + 1).value === 'arrow-right'" :size="12" class="flex-shrink-0" />
-                      <ArrowDown v-if="shouldShowIndicator(round, index + 1) && getPositionIndicator(round, index + 1).type === 'icon' && getPositionIndicator(round, index + 1).value === 'arrow-down'" :size="12" class="flex-shrink-0" />
-                      <X v-if="shouldShowIndicator(round, index + 1) && getPositionIndicator(round, index + 1).type === 'icon' && getPositionIndicator(round, index + 1).value === 'x'" :size="12" class="flex-shrink-0" />
-                      <span v-if="shouldShowIndicator(round, index + 1) && getPositionIndicator(round, index + 1).type === 'text'" class="text-[8px] opacity-70 flex-shrink-0">{{ getPositionIndicator(round, index + 1).value }}</span>
-                    </div>
-                    <div class="flex gap-1.5 mt-2">
-                      <button @click="saveRaceResult" class="btn btn-primary text-xs py-1 px-2 flex-1">
-                        Lagre
-                      </button>
-                      <button @click="cancelEditingRace" class="btn btn-ghost text-xs py-1 px-2">
-                        Avbryt
-                      </button>
-                    </div>
-                  </div>
-
-                  <!-- View mode -->
-                  <div v-else class="space-y-1">
-                    <div
-                      v-for="row in getRaceRows(race, round, raceIndex)"
-                      :key="row.id"
-                      class="flex items-center gap-2 rounded px-2 py-1 text-xs font-semibold border"
-                      :class="race?.completed
-                        ? getPositionColor(round, row.placement)
-                        : race
-                        ? 'border-amber-200 bg-white text-ink'
-                        : 'border-dashed border-slate-300 bg-transparent text-slate-400'"
-                    >
-                      <span class="w-4 text-[10px] font-semibold">
-                        {{ row.placement }}.
-                      </span>
-                      <span class="truncate flex-1">{{ row.name }}</span>
-                      <ArrowRight v-if="race?.completed && shouldShowIndicator(round, row.placement) && getPositionIndicator(round, row.placement).type === 'icon' && getPositionIndicator(round, row.placement).value === 'arrow-right'" :size="12" class="flex-shrink-0" />
-                      <ArrowDown v-if="race?.completed && shouldShowIndicator(round, row.placement) && getPositionIndicator(round, row.placement).type === 'icon' && getPositionIndicator(round, row.placement).value === 'arrow-down'" :size="12" class="flex-shrink-0" />
-                      <X v-if="race?.completed && shouldShowIndicator(round, row.placement) && getPositionIndicator(round, row.placement).type === 'icon' && getPositionIndicator(round, row.placement).value === 'x'" :size="12" class="flex-shrink-0" />
-                      <span v-if="race?.completed && shouldShowIndicator(round, row.placement) && getPositionIndicator(round, row.placement).type === 'text'" class="text-[8px] opacity-70 flex-shrink-0">{{ getPositionIndicator(round, row.placement).value }}</span>
-                    </div>
-                  </div>
-                </div>
+                  :race="race"
+                  :race-index="raceIndex"
+                  :round="round"
+                  :is-editing="race?.id === editingRaceId"
+                  :editing-placements="editingPlacements"
+                  :get-player-by-id="getPlayerById"
+                  :get-position-color="getPositionColor"
+                  :get-position-indicator="getPositionIndicator"
+                  :should-show-indicator="shouldShowIndicator"
+                  :get-race-rows="getRaceRows"
+                  @start-edit="startEditingRace(race!.id)"
+                  @move-up="movePlayerUp"
+                  @move-down="movePlayerDown"
+                  @save="saveRaceResult"
+                  @cancel="cancelEditingRace"
+                />
               </div>
             </div>
           </div>
@@ -890,28 +736,3 @@ const movePlayerDown = (index: number) => {
     </div>
   </div>
 </template>
-
-<style scoped>
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(40px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.podium-slide-1 {
-  animation: slideUp 0.6s ease-out 0s both;
-}
-
-.podium-slide-2 {
-  animation: slideUp 0.6s ease-out 0.2s both;
-}
-
-.podium-slide-3 {
-  animation: slideUp 0.6s ease-out 0.4s both;
-}
-</style>
