@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, nextTick } from 'vue'
-import { Trophy } from 'lucide-vue-next'
+import { Trophy, ArrowDown, ArrowRight, X } from 'lucide-vue-next'
 
 interface BracketPlayer {
   id: string
@@ -27,10 +27,10 @@ const refreshKey = ref(0)
 
 const roundOrder = [
   'Winner bracket 1',
-  'Winner bracket 2',
   'Loser bracket 1',
-  'Winner bracket finale',
+  'Winner bracket 2',
   'Loser bracket 2',
+  'Winner bracket finale',
   'Qual finale',
   'Consolation',
   'Grand finale',
@@ -63,6 +63,20 @@ const bracketOverview = computed(() => {
   }
   
   return result
+})
+
+const grandFinaleResult = computed(() => {
+  const grandFinaleRaces = bracketOverview.value['Grand finale']
+  if (grandFinaleRaces && grandFinaleRaces.length > 0) {
+    const race = grandFinaleRaces[0]
+    if (race && race.completed && race.placements) {
+      return race.placements.map((playerId, index) => ({
+        placement: index + 1,
+        player: getPlayerById(playerId)
+      }))
+    }
+  }
+  return null
 })
 
 const fillTestNames = () => {
@@ -219,30 +233,34 @@ const advanceBracket = () => {
       const l2_2 = [lb2FromWb2[1], lb2FromL1[0], lb2FromWb2[3], lb2FromL1[2]]
       ensureRace('Loser bracket 2', 0, l2_1)
       ensureRace('Loser bracket 2', 1, l2_2)
-
-      const elimL1 = [getPlacement(l1_1, 2), getPlacement(l1_1, 3), getPlacement(l1_2, 2), getPlacement(l1_2, 3)]
-      ensureConsolation(elimL1, 0)
     }
   }
 
+  // Consolation: Create as soon as Loser bracket 1 is done
+  const l1 = getRoundRacesSorted('Loser bracket 1')
+  if (l1.length >= 2 && l1.every(r => r.completed)) {
+    const l1_1 = l1[0]
+    const l1_2 = l1[1]
+    const elimL1 = [getPlacement(l1_1, 2), getPlacement(l1_1, 3), getPlacement(l1_2, 2), getPlacement(l1_2, 3)]
+    ensureConsolation(elimL1, 0)
+  }
+
+  // Qual finale: 2 losers from winner bracket finale + 2 winners from loser bracket 2
+  const wbf = getRoundRacesSorted('Winner bracket finale')[0]
   const l2 = getRoundRacesSorted('Loser bracket 2')
-  if (l2.length >= 2 && l2.every(r => r.completed)) {
+  if (wbf?.completed && l2.length >= 2 && l2.every(r => r.completed)) {
     const l2_1 = l2[0]
     const l2_2 = l2[1]
 
     const qualPlayers = [
-      getPlacement(l2_1, 0),
-      getPlacement(l2_2, 1),
-      getPlacement(l2_2, 0),
-      getPlacement(l2_1, 1),
+      getPlacement(wbf, 2),      // 3rd place from winner bracket finale
+      getPlacement(wbf, 3),      // 4th place from winner bracket finale
+      getPlacement(l2_1, 0),     // Winner from loser bracket 2 race 1
+      getPlacement(l2_2, 0),     // Winner from loser bracket 2 race 2
     ]
     ensureRace('Qual finale', 0, qualPlayers)
-
-    const elimL2 = [getPlacement(l2_1, 2), getPlacement(l2_1, 3), getPlacement(l2_2, 2), getPlacement(l2_2, 3)]
-    ensureConsolation(elimL2, 1)
   }
 
-  const wbf = getRoundRacesSorted('Winner bracket finale')[0]
   const qual = getRoundRacesSorted('Qual finale')[0]
   if (wbf?.completed && qual?.completed) {
     const grandPlayers = [getPlacement(wbf, 0), getPlacement(wbf, 1), getPlacement(qual, 0), getPlacement(qual, 1)]
@@ -322,30 +340,32 @@ const getPotentialPlayers = (round: string, slot: number): Array<string | null> 
   }
   
   // Qual finale
-  if (round === 'Qual finale' && l2.length >= 2) {
-    const l2_1 = l2[0]
-    const l2_2 = l2[1]
-    if (slot === 0) {
-      return [getPlacement(l2_1, 0), getPlacement(l2_2, 1), getPlacement(l2_2, 0), getPlacement(l2_1, 1)]
+  if (round === 'Qual finale') {
+    if (wbf && l2.length >= 2) {
+      const l2_1 = l2[0]
+      const l2_2 = l2[1]
+      if (slot === 0) {
+        return [
+          getPlacement(wbf, 2),    // 3rd place from winner bracket finale
+          getPlacement(wbf, 3),    // 4th place from winner bracket finale
+          getPlacement(l2_1, 0),   // Winner from loser bracket 2 race 1
+          getPlacement(l2_2, 0),   // Winner from loser bracket 2 race 2
+        ]
+      }
     }
   }
   
   // Consolation
-  if (round === 'Consolation') {
-    if (w1.length >= 4) {
-      const [a, b, c, d] = w1
-      const elimW1 = [getPlacement(a, 3), getPlacement(b, 2), getPlacement(c, 3), getPlacement(d, 2)]
-      if (slot === 0) {
-        return elimW1.filter(p => p !== null)
-      }
-    }
-    if (l2.length >= 2) {
-      const l2_1 = l2[0]
-      const l2_2 = l2[1]
-      const elimL2 = [getPlacement(l2_1, 2), getPlacement(l2_1, 3), getPlacement(l2_2, 2), getPlacement(l2_2, 3)]
-      if (slot === 1) {
-        return elimL2.filter(p => p !== null)
-      }
+  if (round === 'Consolation' && l1.length >= 2) {
+    const l1_1 = l1[0]
+    const l1_2 = l1[1]
+    if (slot === 0) {
+      return [
+        getPlacement(l1_1, 2),   // 3rd from loser bracket 1 race 1
+        getPlacement(l1_1, 3),   // 4th from loser bracket 1 race 1
+        getPlacement(l1_2, 2),   // 3rd from loser bracket 1 race 2
+        getPlacement(l1_2, 3),   // 4th from loser bracket 1 race 2
+      ]
     }
   }
   
@@ -390,6 +410,115 @@ const getRaceRows = (race: BracketRace | null, round?: string, slot?: number) =>
   }))
 }
 
+const getPositionColor = (round: string, position: number): string => {
+  // Grand finale: Gold, Silver, Bronze, White
+  if (round === 'Grand finale') {
+    if (position === 1) return 'bg-yellow-400 text-yellow-950 border-yellow-500'
+    if (position === 2) return 'bg-gray-300 text-gray-900 border-gray-400'
+    if (position === 3) return 'bg-orange-400 text-orange-950 border-orange-500'
+    return 'bg-white text-ink border-gray-300'
+  }
+  
+  // Loser bracket 1: Top 2 advance (yellow - not safe yet), bottom 2 go to consolation (red)
+  if (round === 'Loser bracket 1') {
+    return position <= 2 ? 'bg-yellow-100 text-yellow-900 border-yellow-300' : 'bg-red-100 text-red-900 border-red-300'
+  }
+  
+  // Loser bracket 2: Only 1st advances (yellow - not safe yet), rest eliminated (red)
+  if (round === 'Loser bracket 2') {
+    return position === 1 ? 'bg-yellow-100 text-yellow-900 border-yellow-300' : 'bg-red-100 text-red-900 border-red-300'
+  }
+  
+  // Qual finale: Top 2 advance to grand finale (green), bottom 2 eliminated (red)
+  if (round === 'Qual finale') {
+    return position <= 2 ? 'bg-green-100 text-green-900 border-green-300' : 'bg-red-100 text-red-900 border-red-300'
+  }
+  
+  // Winner bracket 1 & 2: Top 2 advance (green), 3rd-4th go to loser bracket (yellow)
+  if (round === 'Winner bracket 1' || round === 'Winner bracket 2') {
+    return position <= 2 ? 'bg-green-100 text-green-900 border-green-300' : 'bg-yellow-100 text-yellow-900 border-yellow-300'
+  }
+  
+  // Winner bracket finale: Top 2 advance (green), 3rd-4th go to qual finale (yellow)
+  if (round === 'Winner bracket finale') {
+    return position <= 2 ? 'bg-green-100 text-green-900 border-green-300' : 'bg-yellow-100 text-yellow-900 border-yellow-300'
+  }
+  
+  // Consolation: Determining 5-8th place among already eliminated players
+  if (round === 'Consolation') {
+    return 'bg-slate-100 text-slate-900 border-slate-300'
+  }
+  
+  return 'bg-white text-ink border-gray-300'
+}
+
+const getPositionIndicator = (round: string, position: number): { type: 'icon' | 'text' | null, value: string } => {
+  // Winner bracket 1 & 2: 1st-2nd advance to next winner round (arrow right), 3rd-4th go to loser bracket (arrow down)
+  if (round === 'Winner bracket 1' || round === 'Winner bracket 2') {
+    if (position <= 2) {
+      return { type: 'icon', value: 'arrow-right' }
+    } else {
+      return { type: 'icon', value: 'arrow-down' }
+    }
+  }
+  
+  // Winner bracket finale: 1st-2nd go to grand finale (text), 3rd-4th go to qual finale (arrow down)
+  if (round === 'Winner bracket finale') {
+    if (position <= 2) {
+      return { type: 'text', value: 'grand finale' }
+    } else {
+      return { type: 'icon', value: 'arrow-down' }
+    }
+  }
+  
+  // Loser bracket 1: 1st-2nd advance to loser bracket 2 (arrow right), 3rd-4th go to consolation (text)
+  if (round === 'Loser bracket 1') {
+    if (position <= 2) {
+      return { type: 'icon', value: 'arrow-right' }
+    } else {
+      return { type: 'text', value: 'consolation' }
+    }
+  }
+  
+  // Loser bracket 2: 1st advances to qual finale (arrow right), 2nd-4th eliminated (X)
+  if (round === 'Loser bracket 2') {
+    if (position === 1) {
+      return { type: 'icon', value: 'arrow-right' }
+    } else {
+      return { type: 'icon', value: 'x' }
+    }
+  }
+  
+  // Qual finale: 1st-2nd go to grand finale (text), 3rd-4th eliminated (X)
+  if (round === 'Qual finale') {
+    if (position <= 2) {
+      return { type: 'text', value: 'grand finale' }
+    } else {
+      return { type: 'icon', value: 'x' }
+    }
+  }
+  
+  return { type: null, value: '' }
+}
+
+const shouldShowIndicator = (round: string, position: number): boolean => {
+  const indicator = getPositionIndicator(round, position)
+  const color = getPositionColor(round, position)
+  
+  // If it's the "grand finale" text, always show it
+  if (indicator.type === 'text' && indicator.value === 'grand finale') {
+    return true
+  }
+  
+  // If the color is green or yellow, don't show other indicators
+  if (color.includes('bg-green') || color.includes('bg-yellow')) {
+    return false
+  }
+  
+  // Otherwise, show the indicator
+  return true
+}
+
 const getExpectedRaceCount = (round: string): number => {
   const playerCount = players.value.length
   
@@ -407,7 +536,7 @@ const getExpectedRaceCount = (round: string): number => {
     case 'Qual finale':
       return 1
     case 'Consolation':
-      return 2
+      return 1
     case 'Grand finale':
       return 1
     default:
@@ -503,14 +632,13 @@ const movePlayerDown = (index: number) => {
   <div class="content-area">
     <div class="mb-6">
       <h1 class="text-3xl font-semibold mb-2">🍺 Beeriokart</h1>
-      <p class="subtle">Double elimination bracket turnering - alle får minst 3 races, maks 5</p>
     </div>
 
     <!-- Player Setup -->
     <div v-if="!currentRound" class="space-y-6">
       <div class="card p-6">
         <div class="flex items-center justify-between mb-4">
-          <h2 class="section-title">Legg til spillere (maks 16)</h2>
+          <h2 class="section-title">Add players</h2>
           <button @click="fillTestNames" class="btn btn-ghost text-xs">
             🎮 Fyll test-navn
           </button>
@@ -541,174 +669,142 @@ const movePlayerDown = (index: number) => {
           class="btn btn-primary w-full"
         >
           <Trophy :size="20" />
-          Start turnering
+          Start tournament
         </button>
         <p class="text-sm text-muted mt-4 text-center">
-          Legg til minst 4 spillere for å starte
+          Add a minimum of 4 players to start
         </p>
       </div>
     </div>
 
     <!-- Tournament Bracket -->
     <div v-else class="space-y-6">
-      <div class="card p-6">
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="section-title">{{ currentRound }}</h2>
-          <div class="text-sm text-muted">
-            {{ players.length }} spillere aktive
-          </div>
-        </div>
-
-        <!-- Races for current round -->
-        <div class="space-y-4">
-          <div
-            v-for="race in activeRaces"
-            :key="race.id"
-            class="p-4 rounded-xl border bg-white/50"
-          >
-            <div class="font-semibold mb-3">Race {{ activeRaces.indexOf(race) + 1 }}</div>
-            
-            <!-- Editing mode -->
-            <div v-if="editingRaceId === race.id" class="space-y-3">
-              <div class="text-sm text-muted mb-2">Dra for å endre plassering (topp = 1. plass)</div>
-              <div class="space-y-2">
-                <div
-                  v-for="(playerId, index) in editingPlacements"
-                  :key="playerId"
-                  class="flex items-center gap-2 p-2 rounded-lg border border-black/10 bg-white/60"
-                >
-                  <div class="flex flex-col gap-1">
-                    <button
-                      @click="movePlayerUp(index)"
-                      class="text-xs text-muted hover:text-primary"
-                      :disabled="index === 0"
-                      :class="{ 'opacity-30': index === 0 }"
-                    >
-                      ▲
-                    </button>
-                    <button
-                      @click="movePlayerDown(index)"
-                      class="text-xs text-muted hover:text-primary"
-                      :disabled="index === editingPlacements.length - 1"
-                      :class="{ 'opacity-30': index === editingPlacements.length - 1 }"
-                    >
-                      ▼
-                    </button>
-                  </div>
-                  <div class="font-bold text-lg w-8 text-center">
-                    {{ index + 1 }}.
-                  </div>
-                  <span class="font-semibold">{{ getPlayerById(playerId)?.name }}</span>
-                </div>
-              </div>
-              <div class="flex gap-2 mt-4">
-                <button @click="saveRaceResult" class="btn btn-primary flex-1">
-                  Lagre resultat
-                </button>
-                <button @click="cancelEditingRace" class="btn btn-ghost">
-                  Avbryt
-                </button>
-              </div>
-            </div>
-
-            <!-- View mode -->
-            <div v-else>
-              <div v-if="race.completed" class="space-y-2">
-                <div
-                  v-for="(playerId, index) in race.placements"
-                  :key="playerId"
-                  class="flex items-center gap-3 p-2 rounded-lg border border-black/10 bg-white/60"
-                >
-                  <div class="font-bold text-lg w-8">
-                    {{ index + 1 }}.
-                  </div>
-                  <span class="font-semibold">{{ getPlayerById(playerId)?.name }}</span>
-                </div>
-                <button @click="startEditingRace(race.id)" class="btn btn-ghost w-full mt-2 text-sm">
-                  Endre resultat
-                </button>
-              </div>
-              <div v-else>
-                <div class="space-y-2 mb-3">
-                  <div
-                    v-for="(playerId, index) in race.players"
-                    :key="playerId"
-                    class="flex items-center gap-3 p-2 rounded-lg border border-black/10 bg-white/60"
-                  >
-                    <span class="font-semibold">{{ getPlayerById(playerId)?.name }}</span>
-                  </div>
-                </div>
-                <button @click="startEditingRace(race.id)" class="btn btn-primary w-full">
-                  Registrer resultat
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <!-- Bracket overview -->
       <div class="card p-6 space-y-6" :key="`bracket-${refreshKey}`">
         <div class="flex flex-wrap items-center justify-between gap-2">
-          <h2 class="section-title">Bracket oversikt</h2>
+          <h2 class="section-title">Tournament bracket</h2>
+        </div>
+
+        <!-- Legend -->
+        <div class="bg-slate-50 rounded-lg p-4 border border-slate-200">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Race Status -->
+            <div class="space-y-2">
+              <p class="text-xs font-semibold text-muted mb-2">Race Status:</p>
+              <div class="flex items-center gap-2">
+                <div class="w-6 h-6 rounded-full bg-amber-100 border border-amber-300 flex items-center justify-center">
+                  <span class="text-amber-600 text-xs">⏱</span>
+                </div>
+                <span class="text-xs text-ink">Ready to be played</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <div class="w-6 h-6 rounded-full bg-green-100 border border-green-300 flex items-center justify-center">
+                  <span class="text-green-600 text-xs">✓</span>
+                </div>
+                <span class="text-xs text-ink">Race is done</span>
+              </div>
+            </div>
+            
+            <!-- Position Colors -->
+            <div class="space-y-2">
+              <p class="text-xs font-semibold text-muted mb-2">Position Colors:</p>
+              <div class="flex items-center gap-2">
+                <div class="w-6 h-4 bg-green-100 border border-green-300 rounded"></div>
+                <span class="text-xs text-ink">Advances to next round</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <div class="w-6 h-4 bg-yellow-100 border border-yellow-300 rounded"></div>
+                <span class="text-xs text-ink">Moves to loser bracket</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <div class="w-6 h-4 bg-red-100 border border-red-300 rounded"></div>
+                <span class="text-xs text-ink">Eliminated from tournament</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <div class="w-6 h-4 bg-slate-100 border border-slate-300 rounded"></div>
+                <span class="text-xs text-ink">Consolation (5-8th place)</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="space-y-4">
-          <div class="flex flex-wrap gap-3">
+          <!-- Vertical bracket layout in tournament progression order -->
+          <div class="space-y-6">
             <div
-              v-for="round in winnerRounds"
+              v-for="round in roundOrder"
               :key="round"
-              class="flex-1 min-w-[240px] rounded-lg border border-black/10 p-3 bg-white/40"
+              class="rounded-lg border border-black/10 p-4 bg-white/40"
             >
-              <h3 class="text-sm font-semibold text-muted mb-3">{{ round }}</h3>
-              <div class="space-y-2">
-                <div
-                  v-for="(race, raceIndex) in bracketOverview[round]"
-                  :key="race?.id || `placeholder_${round}_${raceIndex}`"
-                  class="rounded-lg border p-2.5"
-                  :class="race ? (race.completed ? 'bg-green-50 border-green-300' : 'bg-amber-50 border-amber-300') : 'bg-slate-50/60 border-dashed'"
-                >
-                  <div class="text-[10px] uppercase mb-1.5 flex items-center justify-between font-semibold"
-                    :class="race ? (race.completed ? 'text-green-700' : 'text-amber-700') : 'text-slate-400'">
-                    <span>Race {{ raceIndex + 1 }}</span>
-                    <span v-if="race?.completed" class="text-green-600 text-sm">✓</span>
-                    <span v-else-if="race" class="text-amber-600 text-sm">⏱</span>
-                  </div>
-                  <div class="space-y-1">
-                    <div
-                      v-for="row in getRaceRows(race, round, raceIndex)"
-                      :key="row.id"
-                      class="flex items-center gap-2 rounded px-2 py-1 text-xs font-semibold border"
-                      :class="race?.completed
-                        ? 'border-green-200 bg-white text-ink' 
-                        : race
-                        ? 'border-amber-200 bg-white text-ink'
-                        : 'border-dashed border-slate-300 bg-transparent text-slate-400'"
+              <h3 class="text-base font-bold text-muted mb-4">{{ round }}</h3>
+              
+              <!-- Podium for completed Grand finale -->
+              <div v-if="round === 'Grand finale' && grandFinaleResult" class="w-full max-w-4xl mx-auto">
+                <div class="flex items-end justify-center gap-4">
+                  <!-- 2nd Place -->
+                  <div class="flex-1 flex flex-col items-center podium-slide-2">
+                    <div class="text-center mb-4 space-y-2">
+                      <div class="text-4xl font-bold mb-2 text-slate-300">🥈</div>
+                      <p class="font-semibold text-lg">{{ grandFinaleResult[1]?.player?.name }}</p>
+                      <div class="mt-3">
+                        <p class="text-2xl font-bold">2nd</p>
+                      </div>
+                    </div>
+                    <div 
+                      class="w-full h-32 rounded-t-lg flex flex-col items-center justify-center transition-all bg-slate-300 text-slate-950"
                     >
-                      <span class="w-4 text-[10px] font-semibold text-muted">
-                        {{ row.placement }}.
-                      </span>
-                      <span class="truncate">{{ row.name }}</span>
+                      <div class="text-3xl font-bold">2</div>
+                    </div>
+                  </div>
+                  
+                  <!-- 1st Place -->
+                  <div class="flex-1 flex flex-col items-center podium-slide-1">
+                    <div class="text-center mb-4 space-y-2">
+                      <div class="text-4xl font-bold mb-2 text-amber-400">🥇</div>
+                      <p class="font-semibold text-lg">{{ grandFinaleResult[0]?.player?.name }}</p>
+                      <div class="mt-3">
+                        <p class="text-2xl font-bold">Champion!</p>
+                      </div>
+                    </div>
+                    <div 
+                      class="w-full h-48 rounded-t-lg flex flex-col items-center justify-center transition-all bg-amber-400 text-amber-950"
+                    >
+                      <div class="text-4xl font-bold">1</div>
+                    </div>
+                  </div>
+                  
+                  <!-- 3rd Place -->
+                  <div class="flex-1 flex flex-col items-center podium-slide-3">
+                    <div class="text-center mb-4 space-y-2">
+                      <div class="text-4xl font-bold mb-2 text-orange-600">🥉</div>
+                      <p class="font-semibold text-lg">{{ grandFinaleResult[2]?.player?.name }}</p>
+                      <div class="mt-3">
+                        <p class="text-2xl font-bold">3rd</p>
+                      </div>
+                    </div>
+                    <div 
+                      class="w-full h-20 rounded-t-lg flex flex-col items-center justify-center transition-all bg-orange-600 text-orange-50"
+                    >
+                      <div class="text-2xl font-bold">3</div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
-
-          <div class="flex flex-wrap gap-3">
-            <div
-              v-for="round in loserRounds"
-              :key="round"
-              class="flex-1 min-w-[240px] rounded-lg border border-black/10 p-3 bg-white/40"
-            >
-              <h3 class="text-sm font-semibold text-muted mb-3">{{ round }}</h3>
-              <div class="space-y-2">
+              
+              <div 
+                v-else
+                class="gap-3"
+                :class="round === 'Winner bracket 1' ? 'grid grid-cols-2 max-w-[544px] mx-auto' : 'flex flex-wrap justify-center'"
+              >
                 <div
                   v-for="(race, raceIndex) in bracketOverview[round]"
                   :key="race?.id || `placeholder_${round}_${raceIndex}`"
-                  class="rounded-lg border p-2.5"
-                  :class="race ? (race.completed ? 'bg-green-50 border-green-300' : 'bg-amber-50 border-amber-300') : 'bg-slate-50/60 border-dashed'"
+                  class="w-[260px] rounded-lg border p-2.5"
+                  :class="[
+                    race ? (race.completed ? 'bg-green-200 border-green-400' : 'bg-amber-50 border-amber-300') : 'bg-slate-50/60 border-dashed',
+                    race ? 'cursor-pointer hover:shadow-md transition-shadow' : ''
+                  ]"
+                  @click="race && startEditingRace(race.id)"
                 >
                   <div class="text-[10px] uppercase mb-1.5 flex items-center justify-between font-semibold"
                     :class="race ? (race.completed ? 'text-green-700' : 'text-amber-700') : 'text-slate-400'">
@@ -716,21 +812,73 @@ const movePlayerDown = (index: number) => {
                     <span v-if="race?.completed" class="text-green-600 text-sm">✓</span>
                     <span v-else-if="race" class="text-amber-600 text-sm">⏱</span>
                   </div>
-                  <div class="space-y-1">
+
+                  <!-- Editing mode -->
+                  <div v-if="race && editingRaceId === race.id" class="space-y-2" @click.stop>
+                    <div class="text-[9px] text-muted mb-2">Use arrows to swap position</div>
+                    <div
+                      v-for="(playerId, index) in editingPlacements"
+                      :key="playerId"
+                      class="flex items-center gap-1.5 p-1.5 rounded border"
+                      :class="getPositionColor(round, index + 1)"
+                    >
+                      <div class="flex flex-col gap-0.5">
+                        <button
+                          @click="movePlayerUp(index)"
+                          class="text-[9px] hover:opacity-70"
+                          :disabled="index === 0"
+                          :class="{ 'opacity-30': index === 0 }"
+                        >
+                          ▲
+                        </button>
+                        <button
+                          @click="movePlayerDown(index)"
+                          class="text-[9px] hover:opacity-70"
+                          :disabled="index === editingPlacements.length - 1"
+                          :class="{ 'opacity-30': index === editingPlacements.length - 1 }"
+                        >
+                          ▼
+                        </button>
+                      </div>
+                      <div class="font-bold text-xs w-5 text-center">
+                        {{ index + 1 }}.
+                      </div>
+                      <span class="text-xs font-semibold truncate flex-1">{{ getPlayerById(playerId)?.name }}</span>
+                      <ArrowRight v-if="shouldShowIndicator(round, index + 1) && getPositionIndicator(round, index + 1).type === 'icon' && getPositionIndicator(round, index + 1).value === 'arrow-right'" :size="12" class="flex-shrink-0" />
+                      <ArrowDown v-if="shouldShowIndicator(round, index + 1) && getPositionIndicator(round, index + 1).type === 'icon' && getPositionIndicator(round, index + 1).value === 'arrow-down'" :size="12" class="flex-shrink-0" />
+                      <X v-if="shouldShowIndicator(round, index + 1) && getPositionIndicator(round, index + 1).type === 'icon' && getPositionIndicator(round, index + 1).value === 'x'" :size="12" class="flex-shrink-0" />
+                      <span v-if="shouldShowIndicator(round, index + 1) && getPositionIndicator(round, index + 1).type === 'text'" class="text-[8px] opacity-70 flex-shrink-0">{{ getPositionIndicator(round, index + 1).value }}</span>
+                    </div>
+                    <div class="flex gap-1.5 mt-2">
+                      <button @click="saveRaceResult" class="btn btn-primary text-xs py-1 px-2 flex-1">
+                        Lagre
+                      </button>
+                      <button @click="cancelEditingRace" class="btn btn-ghost text-xs py-1 px-2">
+                        Avbryt
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- View mode -->
+                  <div v-else class="space-y-1">
                     <div
                       v-for="row in getRaceRows(race, round, raceIndex)"
                       :key="row.id"
                       class="flex items-center gap-2 rounded px-2 py-1 text-xs font-semibold border"
                       :class="race?.completed
-                        ? 'border-green-200 bg-white text-ink' 
+                        ? getPositionColor(round, row.placement)
                         : race
                         ? 'border-amber-200 bg-white text-ink'
                         : 'border-dashed border-slate-300 bg-transparent text-slate-400'"
                     >
-                      <span class="w-4 text-[10px] font-semibold text-muted">
+                      <span class="w-4 text-[10px] font-semibold">
                         {{ row.placement }}.
                       </span>
-                      <span class="truncate">{{ row.name }}</span>
+                      <span class="truncate flex-1">{{ row.name }}</span>
+                      <ArrowRight v-if="race?.completed && shouldShowIndicator(round, row.placement) && getPositionIndicator(round, row.placement).type === 'icon' && getPositionIndicator(round, row.placement).value === 'arrow-right'" :size="12" class="flex-shrink-0" />
+                      <ArrowDown v-if="race?.completed && shouldShowIndicator(round, row.placement) && getPositionIndicator(round, row.placement).type === 'icon' && getPositionIndicator(round, row.placement).value === 'arrow-down'" :size="12" class="flex-shrink-0" />
+                      <X v-if="race?.completed && shouldShowIndicator(round, row.placement) && getPositionIndicator(round, row.placement).type === 'icon' && getPositionIndicator(round, row.placement).value === 'x'" :size="12" class="flex-shrink-0" />
+                      <span v-if="race?.completed && shouldShowIndicator(round, row.placement) && getPositionIndicator(round, row.placement).type === 'text'" class="text-[8px] opacity-70 flex-shrink-0">{{ getPositionIndicator(round, row.placement).value }}</span>
                     </div>
                   </div>
                 </div>
@@ -742,3 +890,28 @@ const movePlayerDown = (index: number) => {
     </div>
   </div>
 </template>
+
+<style scoped>
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.podium-slide-1 {
+  animation: slideUp 0.6s ease-out 0s both;
+}
+
+.podium-slide-2 {
+  animation: slideUp 0.6s ease-out 0.2s both;
+}
+
+.podium-slide-3 {
+  animation: slideUp 0.6s ease-out 0.4s both;
+}
+</style>
