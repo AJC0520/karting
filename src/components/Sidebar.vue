@@ -72,8 +72,10 @@ const handleLogout = async () => {
     </div>
 
     <div class="mb-6">
-      <h1 class="text-2xl font-semibold">Mario Kart World</h1>
-      <h1 class="text-2xl font-semibold">Tournament Tracker</h1>
+      <h1 class="text-2xl font-semibold">
+        <span class="block">Mario Kart World</span>
+        <span class="block">Tournament Tracker</span>
+      </h1>
       <div v-if="authStore.userEmail" class="mt-2 flex items-center justify-between text-xs text-muted">
         <span>{{ authStore.userEmail }}</span>
         <button @click="handleLogout" class="text-xs font-semibold hover:text-red-600">
