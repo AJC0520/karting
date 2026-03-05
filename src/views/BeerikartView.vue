@@ -105,7 +105,7 @@ const startTournament = () => {
   collectPlayers()
   
   if (players.value.length < 4) {
-    alert('Du trenger minst 4 spillere')
+    alert('You need at least 4 players')
     return
   }
   
