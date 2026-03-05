@@ -97,10 +97,10 @@ const emit = defineEmits<{
       </div>
       <div class="flex gap-1.5 mt-2">
         <button @click="emit('save')" class="btn btn-primary text-xs py-1 px-2 flex-1">
-          Lagre
+          Save
         </button>
         <button @click="emit('cancel')" class="btn btn-ghost text-xs py-1 px-2">
-          Avbryt
+          Cancel
         </button>
       </div>
     </div>
