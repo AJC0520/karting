@@ -27,7 +27,7 @@
         </div>
         <div class="flex items-center gap-2">
           <div class="w-6 h-4 bg-yellow-100 border border-yellow-300 rounded"></div>
-          <span class="text-xs text-ink">Moves to loser bracket</span>
+          <span class="text-xs text-ink">Still competing (not yet safe)</span>
         </div>
         <div class="flex items-center gap-2">
           <div class="w-6 h-4 bg-red-100 border border-red-300 rounded"></div>
