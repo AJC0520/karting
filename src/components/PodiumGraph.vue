@@ -58,9 +58,6 @@ const graphData = computed((): PlayerRaceData[] => {
     
     // Get leaderboard after this race
     const leaderboard = getLeaderboard(partialTournament)
-    const totalsByPlayer = new Map<ID, number>(
-      leaderboard.map((entry) => [entry.player.id, entry.totalPoints])
-    )
     
     // Record each player's total points
     leaderboard.forEach((entry) => {
