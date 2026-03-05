@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, nextTick } from 'vue'
-import { Trophy, ArrowDown, ArrowRight, X } from 'lucide-vue-next'
+import { Trophy } from 'lucide-vue-next'
 import BracketLegend from '@/components/BracketLegend.vue'
 import BracketPodium from '@/components/BracketPodium.vue'
 import BracketRaceCard from '@/components/BracketRaceCard.vue'
