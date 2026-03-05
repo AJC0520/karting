@@ -39,6 +39,23 @@ const top4Players = computed(() => {
 
 const colors = ['#ef4444', '#f97316', '#3b82f6', '#a855f7'] // red, orange, blue, purple
 
+// Compute leaderboard snapshots once per race to avoid redundant O(n²) recalculations
+const raceSnapshots = computed(() =>
+  racesSorted.value.map((race, raceIndex) => {
+    const partialTournament = {
+      ...props.tournament,
+      races: racesSorted.value.slice(0, raceIndex + 1)
+    }
+    const leaderboard = getLeaderboard(partialTournament)
+    return {
+      leaderboard,
+      totalsByPlayer: new Map<ID, number>(
+        leaderboard.map((entry) => [entry.player.id, entry.totalPoints])
+      )
+    }
+  })
+)
+
 // Calculate tournament standings after each race
 const graphData = computed((): PlayerRaceData[] => {
   const playerPointsOverTime = new Map<ID, (number | null)[]>()
@@ -48,21 +65,8 @@ const graphData = computed((): PlayerRaceData[] => {
     playerPointsOverTime.set(player.id, [])
   })
   
-  // For each race, calculate tournament standings up to that point
-  racesSorted.value.forEach((race, raceIndex) => {
-    // Create a temporary tournament with races up to this point
-    const partialTournament = {
-      ...props.tournament,
-      races: racesSorted.value.slice(0, raceIndex + 1)
-    }
-    
-    // Get leaderboard after this race
-    const leaderboard = getLeaderboard(partialTournament)
-    const totalsByPlayer = new Map<ID, number>(
-      leaderboard.map((entry) => [entry.player.id, entry.totalPoints])
-    )
-    
-    // Record each player's total points
+  // For each race, record each player's total points from the shared snapshot
+  raceSnapshots.value.forEach(({ leaderboard }, raceIndex) => {
     leaderboard.forEach((entry) => {
       const points = playerPointsOverTime.get(entry.player.id)
       if (points) {
@@ -71,7 +75,7 @@ const graphData = computed((): PlayerRaceData[] => {
     })
     
     // For players not in leaderboard (no participation), add null
-    playerPointsOverTime.forEach((points, playerId) => {
+    playerPointsOverTime.forEach((points) => {
       if (points.length <= raceIndex) {
         points.push(null)
       }
@@ -79,14 +83,12 @@ const graphData = computed((): PlayerRaceData[] => {
   })
   
   // Return data for top 4 players
-  return top4Players.value.map((entry, index) => {
-    return {
-      playerId: entry.player.id,
-      playerName: entry.player.name,
-      points: playerPointsOverTime.get(entry.player.id) || [],
-      color: colors[index] || '#6b7280'
-    }
-  })
+  return top4Players.value.map((entry, index) => ({
+    playerId: entry.player.id,
+    playerName: entry.player.name,
+    points: playerPointsOverTime.get(entry.player.id) || [],
+    color: colors[index] || '#6b7280'
+  }))
 })
 
 // SVG dimensions
@@ -265,12 +267,7 @@ const largestGap = computed(() => {
   let leaderPoints = 0
   let lastPoints = 0
 
-  racesSorted.value.forEach((race, raceIndex) => {
-    const partialTournament = {
-      ...props.tournament,
-      races: racesSorted.value.slice(0, raceIndex + 1)
-    }
-    const leaderboard = getLeaderboard(partialTournament)
+  raceSnapshots.value.forEach(({ leaderboard }, raceIndex) => {
     if (!leaderboard.length) return
     const leader = leaderboard[0]
     const last = leaderboard[leaderboard.length - 1]
@@ -310,19 +307,7 @@ const leadershipChanges = computed(() => {
   let previousTotals: Map<ID, number> | null = null
   let previousLeader: ID | null = null
 
-  racesSorted.value.forEach((race, raceIndex) => {
-    // Create a temporary tournament with races up to this point
-    const partialTournament = {
-      ...props.tournament,
-      races: racesSorted.value.slice(0, raceIndex + 1)
-    }
-
-    // Get leaderboard after this race
-    const leaderboard = getLeaderboard(partialTournament)
-    const totalsByPlayer = new Map<ID, number>(
-      leaderboard.map((entry) => [entry.player.id, entry.totalPoints])
-    )
-
+  raceSnapshots.value.forEach(({ leaderboard, totalsByPlayer }, raceIndex) => {
     if (leaderboard.length > 0) {
       const currentLeader = leaderboard[0].player.id
 
