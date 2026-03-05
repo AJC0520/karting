@@ -26,6 +26,67 @@ export interface Database {
           created_at?: string
         }
       }
+      bracket_tournaments: {
+        Row: {
+          id: string
+          user_id: string
+          name: string
+          created_at: string
+          completed: boolean
+          players: Json
+          current_round: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          name: string
+          created_at?: string
+          completed?: boolean
+          players: Json
+          current_round?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          name?: string
+          created_at?: string
+          completed?: boolean
+          players?: Json
+          current_round?: string | null
+        }
+      }
+      bracket_races: {
+        Row: {
+          id: string
+          tournament_id: string
+          round: string
+          race_number: number
+          players: Json
+          placements: Json | null
+          completed: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          tournament_id: string
+          round: string
+          race_number: number
+          players: Json
+          placements?: Json | null
+          completed?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          tournament_id?: string
+          round?: string
+          race_number?: number
+          players?: Json
+          placements?: Json | null
+          completed?: boolean
+          created_at?: string
+        }
+      }
       tournaments: {
         Row: {
           id: string

@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import { ref, computed, nextTick } from 'vue'
-import { Trophy } from 'lucide-vue-next'
+import { ref, computed, nextTick, onMounted } from 'vue'
+import { Trophy, Plus, List, Calendar, CheckCircle2, Trash2 } from 'lucide-vue-next'
+import { useBracketStore, type BracketPlayer, type BracketRaceLocal } from '@/stores/bracketStore'
+import { useAuthStore } from '@/stores/authStore'
 import BracketLegend from '@/components/BracketLegend.vue'
 import BracketPodium from '@/components/BracketPodium.vue'
 import BracketRaceCard from '@/components/BracketRaceCard.vue'
 
-interface BracketPlayer {
-  id: string
-  name: string
-}
+const bracketStore = useBracketStore()
+const authStore = useAuthStore()
 
 interface BracketRace {
   id: string
@@ -22,10 +22,20 @@ interface BracketRace {
 const players = ref<BracketPlayer[]>([])
 const races = ref<BracketRace[]>([])
 const playerNames = ref<string[]>(Array(16).fill(''))
+const tournamentName = ref('')
 const currentRound = ref<string | null>(null)
 const editingRaceId = ref<string | null>(null)
 const editingPlacements = ref<string[]>([])
 const refreshKey = ref(0)
+const showTournamentList = ref(true)
+const showNewTournamentForm = ref(false)
+
+// Load tournaments on mount
+onMounted(async () => {
+  if (authStore.isAuthenticated) {
+    await bracketStore.fetchTournaments()
+  }
+})
 
 
 const roundOrder = [
@@ -101,7 +111,22 @@ const collectPlayers = () => {
     }))
 }
 
-const startTournament = () => {
+const showNewTournamentCreation = () => {
+  showTournamentList.value = false
+  showNewTournamentForm.value = true
+  currentRound.value = null
+  races.value = []
+  players.value = []
+  playerNames.value = Array(16).fill('')
+  tournamentName.value = ''
+}
+
+const cancelNewTournament = () => {
+  showTournamentList.value = true
+  showNewTournamentForm.value = false
+}
+
+const startTournament = async () => {
   collectPlayers()
   
   if (players.value.length < 4) {
@@ -109,9 +134,22 @@ const startTournament = () => {
     return
   }
   
+  if (!tournamentName.value.trim()) {
+    alert('Please enter a tournament name')
+    return
+  }
+  
+  // Create tournament in database
+  const tournament = await bracketStore.createTournament(tournamentName.value.trim(), players.value)
+  if (!tournament) {
+    alert('Failed to create tournament')
+    return
+  }
+  
   // Initialize bracket structure
   races.value = []
   currentRound.value = 'Winner bracket 1'
+  showNewTournamentForm.value = false
   
   // Create initial races for Winner bracket 1
   const shuffled = [...players.value].sort(() => Math.random() - 0.5)
@@ -119,19 +157,47 @@ const startTournament = () => {
   for (let i = 0; i < shuffled.length; i += 4) {
     const racePlayers = shuffled.slice(i, i + 4)
     if (racePlayers.length >= 3) {
-      races.value.push({
+      const race: BracketRace = {
         id: `race${Date.now()}_${i}`,
         round: 'Winner bracket 1',
         slot,
         players: racePlayers.map(p => p.id),
         placements: [],
         completed: false,
-      })
+      }
+      races.value.push(race)
+      
+      // Save race to database
+      await bracketStore.saveRace(race as BracketRaceLocal)
+      
       slot += 1
     }
   }
 
   advanceBracket()
+}
+
+const loadTournament = async (tournamentId: string) => {
+  const result = await bracketStore.loadTournament(tournamentId)
+  if (!result) {
+    alert('Failed to load tournament')
+    return
+  }
+  
+  // Load tournament data
+  const { tournament, races: loadedRaces } = result
+  players.value = tournament.players as BracketPlayer[]
+  races.value = loadedRaces as BracketRace[]
+  currentRound.value = tournament.current_round
+  showTournamentList.value = false
+  refreshKey.value++
+}
+
+const backToTournamentList = () => {
+  showTournamentList.value = true
+  showNewTournamentForm.value = false
+  currentRound.value = null
+  bracketStore.clearCurrent()
 }
 
 const getRoundRacesSorted = (round: string) => {
@@ -140,7 +206,7 @@ const getRoundRacesSorted = (round: string) => {
     .sort((a, b) => a.slot - b.slot)
 }
 
-const ensureRace = (round: string, slot: number, playerIds: Array<string | null>) => {
+const ensureRace = async (round: string, slot: number, playerIds: Array<string | null>) => {
   const uniquePlayers = playerIds.filter((id, index, list): id is string => {
     return Boolean(id) && list.indexOf(id) === index
   })
@@ -152,14 +218,18 @@ const ensureRace = (round: string, slot: number, playerIds: Array<string | null>
     }
     return
   }
-  races.value.push({
+  const newRace: BracketRace = {
     id: `race_${round}_${slot}_${Date.now()}`,
     round,
     slot,
     players: uniquePlayers,
     placements: [],
     completed: false,
-  })
+  }
+  races.value.push(newRace)
+  
+  // Save to database
+  await bracketStore.saveRace(newRace as BracketRaceLocal)
 }
 
 const getPlacement = (race: BracketRace | undefined, index: number) => {
@@ -167,10 +237,10 @@ const getPlacement = (race: BracketRace | undefined, index: number) => {
   return race.placements[index] ?? null
 }
 
-const ensureConsolation = (playersToAdd: Array<string | null>, slot: number) => {
+const ensureConsolation = async (playersToAdd: Array<string | null>, slot: number) => {
   const playersFiltered = playersToAdd.filter((id): id is string => Boolean(id))
   if (playersFiltered.length >= 3) {
-    ensureRace('Consolation', slot, playersFiltered)
+    await ensureRace('Consolation', slot, playersFiltered)
   }
 }
 
@@ -184,20 +254,20 @@ const updateCurrentRound = () => {
   }
 }
 
-const advanceBracket = () => {
+const advanceBracket = async () => {
   const w1 = getRoundRacesSorted('Winner bracket 1')
   if (w1.length >= 4 && w1.every(r => r.completed)) {
     const [a, b, c, d] = w1
 
     const w2_1 = [getPlacement(a, 0), getPlacement(b, 1), getPlacement(c, 0), getPlacement(d, 1)]
     const w2_2 = [getPlacement(b, 0), getPlacement(a, 1), getPlacement(d, 0), getPlacement(c, 1)]
-    ensureRace('Winner bracket 2', 0, w2_1)
-    ensureRace('Winner bracket 2', 1, w2_2)
+    await ensureRace('Winner bracket 2', 0, w2_1)
+    await ensureRace('Winner bracket 2', 1, w2_2)
 
     const l1_1 = [getPlacement(a, 2), getPlacement(b, 3), getPlacement(c, 2), getPlacement(d, 3)]
     const l1_2 = [getPlacement(b, 2), getPlacement(a, 3), getPlacement(d, 2), getPlacement(c, 3)]
-    ensureRace('Loser bracket 1', 0, l1_1)
-    ensureRace('Loser bracket 1', 1, l1_2)
+    await ensureRace('Loser bracket 1', 0, l1_1)
+    await ensureRace('Loser bracket 1', 1, l1_2)
   }
 
   const w2 = getRoundRacesSorted('Winner bracket 2')
@@ -211,7 +281,7 @@ const advanceBracket = () => {
       getPlacement(w2_2, 0),
       getPlacement(w2_1, 1),
     ]
-    ensureRace('Winner bracket finale', 0, wbfPlayers)
+    await ensureRace('Winner bracket finale', 0, wbfPlayers)
 
     const lb2FromWb2 = [
       getPlacement(w2_1, 2),
@@ -234,8 +304,8 @@ const advanceBracket = () => {
 
       const l2_1 = [lb2FromWb2[0], lb2FromL1[1], lb2FromWb2[2], lb2FromL1[3]]
       const l2_2 = [lb2FromWb2[1], lb2FromL1[0], lb2FromWb2[3], lb2FromL1[2]]
-      ensureRace('Loser bracket 2', 0, l2_1)
-      ensureRace('Loser bracket 2', 1, l2_2)
+      await ensureRace('Loser bracket 2', 0, l2_1)
+      await ensureRace('Loser bracket 2', 1, l2_2)
     }
   }
 
@@ -245,7 +315,7 @@ const advanceBracket = () => {
     const l1_1 = l1[0]
     const l1_2 = l1[1]
     const elimL1 = [getPlacement(l1_1, 2), getPlacement(l1_1, 3), getPlacement(l1_2, 2), getPlacement(l1_2, 3)]
-    ensureConsolation(elimL1, 0)
+    await ensureConsolation(elimL1, 0)
   }
 
   // Qual finale: 2 losers from winner bracket finale + 2 winners from loser bracket 2
@@ -261,13 +331,13 @@ const advanceBracket = () => {
       getPlacement(l2_1, 0),     // Winner from loser bracket 2 race 1
       getPlacement(l2_2, 0),     // Winner from loser bracket 2 race 2
     ]
-    ensureRace('Qual finale', 0, qualPlayers)
+    await ensureRace('Qual finale', 0, qualPlayers)
   }
 
   const qual = getRoundRacesSorted('Qual finale')[0]
   if (wbf?.completed && qual?.completed) {
     const grandPlayers = [getPlacement(wbf, 0), getPlacement(wbf, 1), getPlacement(qual, 0), getPlacement(qual, 1)]
-    ensureRace('Grand finale', 0, grandPlayers)
+    await ensureRace('Grand finale', 0, grandPlayers)
   }
 
   updateCurrentRound()
@@ -582,6 +652,9 @@ const saveRaceResult = async () => {
   }
   races.value = newRaces
   
+  // Save to database
+  await bracketStore.saveRace(newRaces[raceIndex] as BracketRaceLocal)
+  
   editingRaceId.value = null
   editingPlacements.value = []
 
@@ -592,7 +665,18 @@ const saveRaceResult = async () => {
   await nextTick()
   
   // Then check for bracket advancement
-  advanceBracket()
+  await advanceBracket()
+  
+  // Update current round in database
+  if (currentRound.value) {
+    await bracketStore.updateTournamentRound(currentRound.value)
+  }
+  
+  // Check if tournament is complete (Grand finale is done)
+  const grandFinale = races.value.find(r => r.round === 'Grand finale')
+  if (grandFinale?.completed) {
+    await bracketStore.completeTournament()
+  }
   
   // Force another update for new races
   refreshKey.value++
@@ -619,13 +703,110 @@ const movePlayerDown = (index: number) => {
       <h1 class="text-3xl font-semibold mb-2">🍺 Beeriokart</h1>
     </div>
 
-    <!-- Player Setup -->
-    <div v-if="!currentRound" class="space-y-6">
+    <!-- Tournament List -->
+    <div v-if="showTournamentList" class="space-y-6">
+      <div class="card p-6">
+        <div class="flex items-center justify-between mb-6">
+          <h2 class="section-title">Your Tournaments</h2>
+          <button @click="showNewTournamentCreation" class="btn btn-primary">
+            <Plus :size="20" />
+            New Tournament
+          </button>
+        </div>
+
+        <div v-if="bracketStore.loading" class="text-center py-8 text-muted">
+          Loading tournaments...
+        </div>
+
+        <div v-else-if="bracketStore.tournaments.length === 0" class="text-center py-12">
+          <Trophy :size="48" class="mx-auto mb-4 text-muted opacity-50" />
+          <p class="text-muted mb-4">No tournaments yet.</p>
+          <button @click="showNewTournamentCreation" class="btn btn-primary">
+            <Plus :size="20" />
+            Create Tournament
+          </button>
+        </div>
+
+        <div v-else class="space-y-3">
+          <div
+            v-for="tournament in bracketStore.tournaments"
+            :key="tournament.id"
+            class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
+          >
+            <div class="flex items-start justify-between gap-4">
+              <div class="flex-1">
+                <div class="flex items-center gap-2 mb-1">
+                  <h3 class="font-semibold text-lg">{{ tournament.name }}</h3>
+                  <span
+                    v-if="tournament.completed"
+                    class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-800"
+                  >
+                    <CheckCircle2 :size="12" />
+                    Completed
+                  </span>
+                  <span
+                    v-else
+                    class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-800"
+                  >
+                    In Progress
+                  </span>
+                </div>
+                <div class="text-sm text-muted flex items-center gap-4">
+                  <span class="flex items-center gap-1">
+                    <Calendar :size="14" />
+                    {{ new Date(tournament.created_at).toLocaleDateString() }}
+                  </span>
+                  <span>{{ (tournament.players as any[]).length }} players</span>
+                  <span v-if="tournament.current_round">{{ tournament.current_round }}</span>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <button
+                  @click="loadTournament(tournament.id)"
+                  class="btn btn-ghost btn-sm"
+                >
+                  <List :size="16" />
+                  {{ tournament.completed ? 'View' : 'Continue' }}
+                </button>
+                <button
+                  @click="bracketStore.deleteTournament(tournament.id)"
+                  class="btn btn-ghost btn-sm text-red-600 hover:bg-red-50"
+                  title="Delete tournament"
+                >
+                  <Trash2 :size="16" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- New Tournament / Player Setup -->
+    <div v-else-if="showNewTournamentForm" class="space-y-6">
       <div class="card p-6">
         <div class="flex items-center justify-between mb-4">
-          <h2 class="section-title">Add players</h2>
+          <h2 class="section-title">Create New Tournament</h2>
+          <button @click="cancelNewTournament" class="btn btn-ghost text-sm">
+            ← Back to list
+          </button>
+        </div>
+
+        <div class="mb-6">
+          <label class="block text-sm font-medium text-gray-700 mb-2">Tournament Name</label>
+          <input
+            v-model="tournamentName"
+            type="text"
+            placeholder="E.g., Friday Night Beeriokart"
+            class="input w-full"
+            required
+          />
+        </div>
+
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-semibold">Add players</h3>
           <button @click="fillTestNames" class="btn btn-ghost text-xs">
-            🎮 Fyll test-navn
+            🎮 Fill test-names
           </button>
         </div>
         
@@ -643,7 +824,7 @@ const movePlayerDown = (index: number) => {
             <input
               v-model="playerNames[index]"
               type="text"
-              :placeholder="`Spiller ${index + 1}`"
+              :placeholder="`Player ${index + 1}`"
               class="input flex-1"
             />
           </div>
@@ -652,9 +833,10 @@ const movePlayerDown = (index: number) => {
         <button
           @click="startTournament"
           class="btn btn-primary w-full"
+          :disabled="bracketStore.loading"
         >
           <Trophy :size="20" />
-          Start tournament
+          {{ bracketStore.loading ? 'Creating...' : 'Start Tournament' }}
         </button>
         <p class="text-sm text-muted mt-4 text-center">
           Add a minimum of 4 players to start
@@ -663,7 +845,14 @@ const movePlayerDown = (index: number) => {
     </div>
 
     <!-- Tournament Bracket -->
-    <div v-else class="space-y-6">
+    <div v-else-if="currentRound" class="space-y-6">
+      <div class="card p-4 flex items-center justify-between">
+        <button @click="backToTournamentList" class="btn btn-ghost">
+          ← Back to tournaments
+        </button>
+        <h2 class="text-lg font-semibold">{{ bracketStore.currentTournament?.name }}</h2>
+        <div></div>
+      </div>
       <!-- Bracket overview -->
       <div class="card p-6 space-y-6" :key="`bracket-${refreshKey}`">
         <div class="flex flex-wrap items-center justify-between gap-2">
