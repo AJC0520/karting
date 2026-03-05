@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 
 import { useAppStore } from '@/stores/appStore'
 import { useAuthStore } from '@/stores/authStore'
-import { CircleQuestionMarkIcon, Home } from 'lucide-vue-next'
+import { CircleHelp as CircleQuestionMarkIcon, Home } from 'lucide-vue-next'
 
 const store = useAppStore()
 const authStore = useAuthStore()
