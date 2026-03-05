@@ -24,7 +24,7 @@ When racing with my friends, I realized there was no good way for keeping track 
 ### Statistics & Analytics
 - Real-time leaderboard with point gaps and last race performance
 - Player statistics: wins, podiums, average finish, win streaks, recent form
-- Tournament insights: most-played tracks, closest races, win rates
+- Tournament insights: most-played tracks, win rates
 - Visual leadership progression chart showing point accumulation over time
 - Podium graph with overtake labels showing leadership changes
 
