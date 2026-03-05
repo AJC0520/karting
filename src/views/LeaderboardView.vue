@@ -140,7 +140,7 @@ const longestStreak = computed(() => {
     </div>
     
     <!-- Position Performance Graph -->
-    <PodiumGraph v-if="tournament" :tournament="tournament" />
+    <PodiumGraph v-if="tournament && tournament.races.length > 1" :tournament="tournament"/>
 
     <div v-if="stats" class="space-y-4">
       <div class="text-xs text-muted">
