@@ -547,27 +547,9 @@ const getExpectedRaceCount = (round: string): number => {
   }
 }
 
-const getRacesWithPlaceholders = (round: string): Array<BracketRace | null> => {
-  const existingRaces = getRoundRacesSorted(round)
-  const expectedCount = getExpectedRaceCount(round)
-  const result: Array<BracketRace | null> = []
-  
-  for (let slot = 0; slot < expectedCount; slot++) {
-    const race = existingRaces.find(r => r.slot === slot)
-    result.push(race || null)
-  }
-  
-  return result
-}
-
 const getRacesForRound = (round: string) => {
   return getRoundRacesSorted(round)
 }
-
-const activeRaces = computed(() => {
-  return currentRound.value ? getRacesForRound(currentRound.value) : []
-})
-
 const getPlayerById = (id: string) => {
   return players.value.find(p => p.id === id)
 }
