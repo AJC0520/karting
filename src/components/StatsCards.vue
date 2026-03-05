@@ -1,11 +1,17 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref, toRefs } from 'vue'
 
-defineProps<{
+const props = defineProps<{
   items: Array<{ label: string; value: string | number; helper?: string; description?: string }>
 }>()
 
+const { items } = toRefs(props)
 const hoveredIndex = ref<number | null>(null)
+const hoveredItem = computed(() => {
+  const index = hoveredIndex.value
+  return index === null ? null : items.value[index]
+})
+const hasDescriptions = computed(() => items.value.some((item) => item.description))
 </script>
 
 <template>
@@ -31,14 +37,13 @@ const hoveredIndex = ref<number | null>(null)
       </div>
       <p class="mt-2 text-2xl font-semibold">{{ item.value }}</p>
       <p v-if="item.helper" class="mt-1 text-xs text-muted">{{ item.helper }}</p>
-      
-      <!-- Tooltip -->
-      <div 
-        v-if="item.description && hoveredIndex === index"
-        class="absolute z-10 left-0 right-0 -bottom-2 translate-y-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-300 shadow-lg"
-      >
-        {{ item.description }}
-      </div>
     </div>
   </div>
+  <p v-if="hasDescriptions" class="mt-2 text-xs text-muted">
+    <span v-if="hoveredItem?.description">
+      <span class="font-semibold text-zinc-800">{{ hoveredItem.label }}:</span>
+      {{ hoveredItem.description }}
+    </span>
+    <span v-else>Hover an achievement to see the description.</span>
+  </p>
 </template>

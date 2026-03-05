@@ -34,7 +34,6 @@ export type PlayerStats = {
 export type TournamentStats = {
   totalRaces: number
   mostPlayedTrack?: { track: string; count: number }
-  closestRace?: { raceId: ID; track: string; timestamp: string; spread: number }
   winRates: Array<{ player: Player; wins: number; total: number; rate: number }>
   streaks: Array<{ player: Player; current: number; longest: number }>
   mostConsistent?: { player: Player; gap: number }
@@ -164,29 +163,12 @@ export function getTournamentStats(tournament: Tournament): TournamentStats {
   const pointsByRace = buildRacePointsMap(tournament, races)
 
   const trackCounts = new Map<string, { track: string; count: number }>()
-  let closestRace: TournamentStats['closestRace']
-
   races.forEach((race) => {
     const key = race.track.trim().toLowerCase() || 'unknown'
     const entry = trackCounts.get(key) ?? { track: race.track || 'Unknown track', count: 0 }
     entry.count += 1
     trackCounts.set(key, entry)
 
-    const points = pointsByRace.get(race.id)
-    if (points) {
-      const values = Object.values(points)
-      if (values.length) {
-        const spread = Math.max(...values) - Math.min(...values)
-        if (!closestRace || spread < closestRace.spread) {
-          closestRace = {
-            raceId: race.id,
-            track: race.track,
-            timestamp: race.timestamp,
-            spread,
-          }
-        }
-      }
-    }
   })
 
   const mostPlayedTrack = [...trackCounts.values()].sort((a, b) => b.count - a.count)[0]
@@ -299,7 +281,6 @@ export function getTournamentStats(tournament: Tournament): TournamentStats {
   return {
     totalRaces: races.length,
     mostPlayedTrack,
-    closestRace,
     winRates,
     streaks,
     mostConsistent,

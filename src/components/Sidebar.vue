@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 
 import { useAppStore } from '@/stores/appStore'
 import { useAuthStore } from '@/stores/authStore'
+import { CircleHelp as CircleQuestionMarkIcon, Home } from 'lucide-vue-next'
 
 const store = useAppStore()
 const authStore = useAuthStore()
@@ -52,10 +53,29 @@ const handleLogout = async () => {
 </script>
 
 <template>
-  <aside class="w-full border-b border-black/5 bg-surface/95 p-4 lg:w-72 lg:border-b-0 lg:border-r">
+  <aside class="w-full border-b border-black/5 bg-surface/95 pt-6 pl-6 pr-4 pb-4 lg:w-72 lg:border-b-0 lg:border-r">
+    <div class="mb-8 flex flex-wrap items-center gap-3">
+      <RouterLink
+        to="/"
+        class="inline-flex items-center gap-2 rounded-xl border border-black/10 bg-white/90 px-4 py-2.5 text-sm font-semibold text-ink shadow-sm transition hover:shadow-md"
+      >
+        <Home></Home>
+        Home  
+      </RouterLink>
+      <RouterLink
+        to="/how-to-use"
+        class="inline-flex items-center gap-2 rounded-xl border border-black/10 bg-white/90 px-4 py-2.5 text-sm font-semibold text-ink shadow-sm transition hover:shadow-md"
+      >
+        <CircleQuestionMarkIcon></CircleQuestionMarkIcon>
+        How to use  
+      </RouterLink>
+    </div>
+
     <div class="mb-6">
-      <h1 class="text-2xl font-semibold">Mario Kart</h1>
-      <h1 class="text-2xl font-semibold">Tournament Tracker</h1>
+      <h1 class="text-2xl font-semibold">
+        <span class="block">Mario Kart World</span>
+        <span class="block">Tournament Tracker</span>
+      </h1>
       <div v-if="authStore.userEmail" class="mt-2 flex items-center justify-between text-xs text-muted">
         <span>{{ authStore.userEmail }}</span>
         <button @click="handleLogout" class="text-xs font-semibold hover:text-red-600">
@@ -64,13 +84,16 @@ const handleLogout = async () => {
       </div>
     </div>
 
-    <RouterLink to="/create-tournament" class="btn btn-primary w-full mb-6">
+    <RouterLink to="/create-tournament" class="btn btn-primary w-full mb-4">
       Create tournament
+    </RouterLink>
+
+    <RouterLink to="/beeriokart" class="btn btn-accent w-full mb-6">
+      🍺 Beeriokart
     </RouterLink>
 
     <div class="mb-4 flex items-center justify-between">
       <h2 class="section-title">Tournaments</h2>
-      <RouterLink class="btn btn-ghost text-xs" to="/">Home</RouterLink>
     </div>
 
     <div v-if="!tournaments.length" class="subtle">

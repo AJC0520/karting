@@ -6,7 +6,7 @@ import PodiumGraph from '@/components/PodiumGraph.vue'
 import StatsCards from '@/components/StatsCards.vue'
 import TournamentTabs from '@/components/TournamentTabs.vue'
 import { useAppStore } from '@/stores/appStore'
-import { formatNumber, formatDateTime } from '@/utils/format'
+import { formatNumber } from '@/utils/format'
 import { getLeaderboard, getTournamentStats } from '@/utils/stats'
 
 const route = useRoute()
@@ -32,12 +32,23 @@ const podiumOrder = computed(() => {
   return [top[1], top[0], top[2], top[3]] // 2nd, 1st, 3rd, 4th
 })
 
-const getPodiumHeight = (rank: number) => {
-  if (rank === 1) return 'h-48'
-  if (rank === 2) return 'h-36'
-  if (rank === 3) return 'h-28'
-  if (rank === 4) return 'h-20'
-  return 'h-32'
+const podiumScale = computed(() => {
+  const entries = topFour.value
+  if (entries.length === 0) return { minPoints: 0, maxPoints: 0 }
+  const points = entries.map((entry) => entry.totalPoints)
+  return {
+    minPoints: Math.min(...points),
+    maxPoints: Math.max(...points),
+  }
+})
+
+const getPodiumHeight = (points: number) => {
+  const minHeight = 80
+  const maxHeight = 200
+  const { minPoints, maxPoints } = podiumScale.value
+  if (maxPoints === minPoints) return maxHeight
+  const ratio = (points - minPoints) / (maxPoints - minPoints)
+  return Math.round(minHeight + ratio * (maxHeight - minHeight))
 }
 
 const getRankColor = (rank: number) => {
@@ -119,7 +130,8 @@ const longestStreak = computed(() => {
           <!-- Podium Block -->
           <div 
             class="w-full rounded-t-lg flex flex-col items-center justify-center transition-all"
-            :class="[getPodiumHeight(entry.rank), getRankColor(entry.rank)]"
+            :class="getRankColor(entry.rank)"
+            :style="{ height: `${getPodiumHeight(entry.totalPoints)}px` }"
           >
             <div class="text-3xl font-bold">{{ entry.rank }}</div>
           </div>
@@ -131,63 +143,52 @@ const longestStreak = computed(() => {
     <PodiumGraph v-if="tournament" :tournament="tournament" />
 
     <div v-if="stats" class="space-y-4">
-      <div class="flex items-center justify-between">
-        <h3 class="section-title">Tournament statistics</h3>
-        <span class="text-xs text-muted">{{ stats.totalRaces }} total races · {{ stats.uniqueTracks }} unique tracks</span>
+      <div class="text-xs text-muted">
+        {{ stats.totalRaces }} total races / {{ stats.uniqueTracks }} unique tracks
       </div>
       <StatsCards
         :items="[
           {
             label: 'Most played track',
-            value: stats.mostPlayedTrack?.track ?? '—',
+            value: stats.mostPlayedTrack?.track ?? '-',
             helper: stats.mostPlayedTrack ? `${stats.mostPlayedTrack.count} races` : undefined,
-          },
-          {
-            label: 'Closest race',
-            value: stats.closestRace ? formatNumber(stats.closestRace.spread, 2) : '—',
-            helper: stats.closestRace ? `${stats.closestRace.track} · ${formatDateTime(stats.closestRace.timestamp)}` : undefined,
+            description: 'Track that has been raced the most across the tournament',
           },
           {
             label: 'Top win rate',
-            value: topWinRate?.player.name ?? '—',
+            value: topWinRate?.player.name ?? '-',
             helper: topWinRate ? `${topWinRate.wins} wins in ${topWinRate.total} races` : undefined,
+            description: 'Player with the highest win rate among all races',
           },
           {
             label: 'Longest streak',
             value: longestStreak?.longest ?? 0,
-            helper: longestStreak?.player.name ?? '—',
+            helper: longestStreak?.player.name ?? '-',
+            description: 'Longest consecutive win streak by a single player',
           },
-        ]"
-      />
-      
-      <div class="mt-6 flex items-center justify-between">
-        <h3 class="section-title">Player achievements</h3>
-      </div>
-      <StatsCards
-        :items="[
           {
             label: 'Most consistent',
-            value: stats.mostConsistent?.player.name ?? '—',
+            value: stats.mostConsistent?.player.name ?? '-',
             helper: stats.mostConsistent ? `${stats.mostConsistent.gap} position gap` : undefined,
             description: 'Player with the smallest gap between their best and worst finishing positions',
           },
           {
             label: 'Podium king',
-            value: stats.podiumKing?.player.name ?? '—',
+            value: stats.podiumKing?.player.name ?? '-',
             helper: stats.podiumKing ? `${formatNumber(stats.podiumKing.percentage, 1)}% podiums` : undefined,
             description: 'Player with the highest percentage of podium finishes (top 3 positions)',
           },
           {
             label: 'Average points per race',
-            value: stats.avgPointsPerRace?.player.name ?? '—',
+            value: stats.avgPointsPerRace?.player.name ?? '-',
             helper: stats.avgPointsPerRace ? `${formatNumber(stats.avgPointsPerRace.avgPoints, 1)} pts/race` : undefined,
             description: 'Player with the highest average points scored per race',
           },
           {
             label: 'First loser',
-            value: stats.firstLoser?.player.name ?? '—',
+            value: stats.firstLoser?.player.name ?? '-',
             helper: stats.firstLoser ? `${stats.firstLoser.secondPlaces} second places` : undefined,
-            description: 'Player with the most 2nd place finishes (so close!)',
+            description: 'Player with the most 2nd place finishes',
           },
         ].concat(stats.mostBlueShellBonuses ? [{
           label: 'Blue Shell Warrior',
@@ -203,4 +204,3 @@ const longestStreak = computed(() => {
     Tournament not found. Choose one from the sidebar.
   </section>
 </template>
-

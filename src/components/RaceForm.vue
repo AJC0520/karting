@@ -34,6 +34,20 @@ const validationError = computed(() => {
     return pos !== null && pos !== undefined && pos > 0
   })
   if (!hasAnyPosition) return 'Enter at least one player position.'
+  const counts = new Map<number, number>()
+  activePlayers.value.forEach((player) => {
+    const pos = positionMap.value[player.id]
+    if (pos !== null && pos !== undefined && pos > 0) {
+      counts.set(pos, (counts.get(pos) ?? 0) + 1)
+    }
+  })
+  const duplicates = [...counts.entries()]
+    .filter(([, count]) => count > 1)
+    .map(([pos]) => pos)
+    .sort((a, b) => a - b)
+  if (duplicates.length > 0) {
+    return `Each position must be unique. Duplicate positions: ${duplicates.join(', ')}.`
+  }
   return ''
 })
 

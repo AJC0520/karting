@@ -1,6 +1,7 @@
 import type { RouteRecordRaw } from 'vue-router'
 
 import HomeView from '@/views/HomeView.vue'
+import HowToUseView from '@/views/HowToUseView.vue'
 import CreateTournamentView from '@/views/CreateTournamentView.vue'
 import LeaderboardView from '@/views/LeaderboardView.vue'
 import RacesView from '@/views/RacesView.vue'
@@ -9,6 +10,7 @@ import PlayersView from '@/views/PlayersView.vue'
 import MapView from '@/views/MapView.vue'
 import LoginView from '@/views/LoginView.vue'
 import SignupView from '@/views/SignupView.vue'
+import BeerikartView from '@/views/BeerikartView.vue'
 
 export const routes: RouteRecordRaw[] = [
   {
@@ -30,9 +32,21 @@ export const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true },
   },
   {
+    path: '/how-to-use',
+    name: 'how-to-use',
+    component: HowToUseView,
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/create-tournament',
     name: 'create-tournament',
     component: CreateTournamentView,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/beeriokart',
+    name: 'beeriokart',
+    component: BeerikartView,
     meta: { requiresAuth: true },
   },
   {
