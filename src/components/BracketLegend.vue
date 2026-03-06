@@ -35,7 +35,7 @@
         </div>
         <div class="flex items-center gap-2">
           <div class="w-6 h-4 bg-slate-100 border border-slate-300 rounded"></div>
-          <span class="text-xs text-ink">Consolation (5-8th place)</span>
+          <span class="text-xs text-ink">Consolation</span>
         </div>
       </div>
     </div>

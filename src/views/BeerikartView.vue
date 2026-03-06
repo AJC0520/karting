@@ -3,6 +3,8 @@ import { ref, computed, nextTick, onMounted } from 'vue'
 import { Trophy, Plus, List, Calendar, CheckCircle2, Trash2 } from 'lucide-vue-next'
 import { useBracketStore, type BracketPlayer, type BracketRaceLocal } from '@/stores/bracketStore'
 import { useAuthStore } from '@/stores/authStore'
+import { supabase } from '@/lib/supabase'
+import type { Json } from '@/lib/database.types'
 import BracketLegend from '@/components/BracketLegend.vue'
 import BracketPodium from '@/components/BracketPodium.vue'
 import BracketRaceCard from '@/components/BracketRaceCard.vue'
@@ -29,6 +31,27 @@ const editingPlacements = ref<string[]>([])
 const refreshKey = ref(0)
 const showTournamentList = ref(true)
 const showNewTournamentForm = ref(false)
+const jokerCount = ref(0)
+
+// Player swap state
+const swapModalOpen = ref(false)
+const swapRaceId = ref<string | null>(null)
+const swapPlayerIndex = ref<number | null>(null)
+
+// Helper to check if a player is a joker
+const isJoker = (playerId: string | null): boolean => {
+  return playerId?.startsWith('joker_') ?? false
+}
+
+// Helper to create a joker player
+const createJoker = (): BracketPlayer => {
+  const joker: BracketPlayer = {
+    id: `joker_${Date.now()}_${jokerCount.value++}`,
+    name: '🃏 Joker'
+  }
+  players.value.push(joker)
+  return joker
+}
 
 // Load tournaments on mount
 onMounted(async () => {
@@ -119,6 +142,7 @@ const showNewTournamentCreation = () => {
   players.value = []
   playerNames.value = Array(16).fill('')
   tournamentName.value = ''
+  jokerCount.value = 0
 }
 
 const cancelNewTournament = () => {
@@ -129,8 +153,8 @@ const cancelNewTournament = () => {
 const startTournament = async () => {
   collectPlayers()
   
-  if (players.value.length < 4) {
-    alert('You need at least 4 players')
+  if (players.value.length < 12) {
+    alert('You need at least 12 players')
     return
   }
   
@@ -151,17 +175,35 @@ const startTournament = async () => {
   currentRound.value = 'Winner bracket 1'
   showNewTournamentForm.value = false
   
-  // Create initial races for Winner bracket 1
+  // Create initial races for Winner bracket 1 with optimal distribution
   const shuffled = [...players.value].sort(() => Math.random() - 0.5)
-  let slot = 0
-  for (let i = 0; i < shuffled.length; i += 4) {
-    const racePlayers = shuffled.slice(i, i + 4)
+  
+  // Calculate optimal distribution (3-4 players per race)
+  const playerCount = shuffled.length
+  const numRaces = Math.ceil(playerCount / 4)
+  const baseSize = Math.floor(playerCount / numRaces)
+  const remainder = playerCount % numRaces
+  
+  let playerIndex = 0
+  for (let slot = 0; slot < numRaces; slot++) {
+    // First 'remainder' races get one extra player
+    const raceSize = slot < remainder ? baseSize + 1 : baseSize
+    const racePlayers = shuffled.slice(playerIndex, playerIndex + raceSize)
+    
     if (racePlayers.length >= 3) {
+      const racePlayerIds = racePlayers.map(p => p.id)
+      
+      // Add jokers to fill up to 4 players
+      while (racePlayerIds.length < 4) {
+        const joker = createJoker()
+        racePlayerIds.push(joker.id)
+      }
+      
       const race: BracketRace = {
-        id: `race${Date.now()}_${i}`,
+        id: `race${Date.now()}_${slot}`,
         round: 'Winner bracket 1',
         slot,
-        players: racePlayers.map(p => p.id),
+        players: racePlayerIds,
         placements: [],
         completed: false,
       }
@@ -169,9 +211,17 @@ const startTournament = async () => {
       
       // Save race to database
       await bracketStore.saveRace(race as BracketRaceLocal)
-      
-      slot += 1
     }
+    
+    playerIndex += raceSize
+  }
+  
+  // Update tournament with jokers included
+  if (jokerCount.value > 0) {
+    await supabase
+      .from('bracket_tournaments')
+      .update({ players: players.value as unknown as Json })
+      .eq('id', tournament.id)
   }
 
   advanceBracket()
@@ -190,6 +240,10 @@ const loadTournament = async (tournamentId: string) => {
   races.value = loadedRaces as BracketRace[]
   currentRound.value = tournament.current_round
   showTournamentList.value = false
+  
+  // Reset joker count based on loaded jokers
+  jokerCount.value = players.value.filter(p => isJoker(p.id)).length
+  
   refreshKey.value++
 }
 
@@ -207,14 +261,23 @@ const getRoundRacesSorted = (round: string) => {
 }
 
 const ensureRace = async (round: string, slot: number, playerIds: Array<string | null>) => {
+  // Filter out nulls and duplicates - keep jokers as they advance like real players
   const uniquePlayers = playerIds.filter((id, index, list): id is string => {
     return Boolean(id) && list.indexOf(id) === index
   })
   if (uniquePlayers.length < 3) return
+  
+  // Add NEW jokers to fill up to 4 players (only if we're under 4)
+  const playersWithJokers = [...uniquePlayers]
+  while (playersWithJokers.length < 4) {
+    const joker = createJoker()
+    playersWithJokers.push(joker.id)
+  }
+  
   const existing = races.value.find(r => r.round === round && r.slot === slot)
   if (existing) {
     if (!existing.completed) {
-      existing.players = uniquePlayers
+      existing.players = playersWithJokers
     }
     return
   }
@@ -222,7 +285,7 @@ const ensureRace = async (round: string, slot: number, playerIds: Array<string |
     id: `race_${round}_${slot}_${Date.now()}`,
     round,
     slot,
-    players: uniquePlayers,
+    players: playersWithJokers,
     placements: [],
     completed: false,
   }
@@ -238,7 +301,7 @@ const getPlacement = (race: BracketRace | undefined, index: number) => {
 }
 
 const ensureConsolation = async (playersToAdd: Array<string | null>, slot: number) => {
-  const playersFiltered = playersToAdd.filter((id): id is string => Boolean(id))
+  const playersFiltered = playersToAdd.filter((id): id is string => Boolean(id) && !isJoker(id))
   if (playersFiltered.length >= 3) {
     await ensureRace('Consolation', slot, playersFiltered)
   }
@@ -256,18 +319,52 @@ const updateCurrentRound = () => {
 
 const advanceBracket = async () => {
   const w1 = getRoundRacesSorted('Winner bracket 1')
-  if (w1.length >= 4 && w1.every(r => r.completed)) {
-    const [a, b, c, d] = w1
-
-    const w2_1 = [getPlacement(a, 0), getPlacement(b, 1), getPlacement(c, 0), getPlacement(d, 1)]
-    const w2_2 = [getPlacement(b, 0), getPlacement(a, 1), getPlacement(d, 0), getPlacement(c, 1)]
-    await ensureRace('Winner bracket 2', 0, w2_1)
-    await ensureRace('Winner bracket 2', 1, w2_2)
-
-    const l1_1 = [getPlacement(a, 2), getPlacement(b, 3), getPlacement(c, 2), getPlacement(d, 3)]
-    const l1_2 = [getPlacement(b, 2), getPlacement(a, 3), getPlacement(d, 2), getPlacement(c, 3)]
-    await ensureRace('Loser bracket 1', 0, l1_1)
-    await ensureRace('Loser bracket 1', 1, l1_2)
+  
+  // Check if ALL Winner bracket 1 races are complete (not hardcoded to 4)
+  if (w1.length > 0 && w1.every(r => r.completed)) {
+    // Collect top 2 (for Winner bracket 2) and 3rd-4th (for Loser bracket 1)
+    const w2Players: string[] = []
+    const l1Players: string[] = []
+    
+    for (const race of w1) {
+      const p1 = getPlacement(race, 0)
+      const p2 = getPlacement(race, 1)
+      const p3 = getPlacement(race, 2)
+      const p4 = getPlacement(race, 3)
+      
+      if (p1) w2Players.push(p1)
+      if (p2) w2Players.push(p2)
+      if (p3) l1Players.push(p3)
+      if (p4) l1Players.push(p4)
+    }
+    
+    // Distribute W2 players across 2 races (alternating to mix)
+    const w2_1: Array<string | null> = []
+    const w2_2: Array<string | null> = []
+    for (let i = 0; i < w2Players.length; i++) {
+      if (i % 2 === 0) {
+        w2_1.push(w2Players[i])
+      } else {
+        w2_2.push(w2Players[i])
+      }
+    }
+    
+    if (w2_1.length > 0) await ensureRace('Winner bracket 2', 0, w2_1)
+    if (w2_2.length > 0) await ensureRace('Winner bracket 2', 1, w2_2)
+    
+    // Distribute L1 players across 2 races (alternating to mix)
+    const l1_1: Array<string | null> = []
+    const l1_2: Array<string | null> = []
+    for (let i = 0; i < l1Players.length; i++) {
+      if (i % 2 === 0) {
+        l1_1.push(l1Players[i])
+      } else {
+        l1_2.push(l1Players[i])
+      }
+    }
+    
+    if (l1_1.length > 0) await ensureRace('Loser bracket 1', 0, l1_1)
+    if (l1_2.length > 0) await ensureRace('Loser bracket 1', 1, l1_2)
   }
 
   const w2 = getRoundRacesSorted('Winner bracket 2')
@@ -311,11 +408,29 @@ const advanceBracket = async () => {
 
   // Consolation: Create as soon as Loser bracket 1 is done
   const l1 = getRoundRacesSorted('Loser bracket 1')
-  if (l1.length >= 2 && l1.every(r => r.completed)) {
-    const l1_1 = l1[0]
-    const l1_2 = l1[1]
-    const elimL1 = [getPlacement(l1_1, 2), getPlacement(l1_1, 3), getPlacement(l1_2, 2), getPlacement(l1_2, 3)]
-    await ensureConsolation(elimL1, 0)
+  if (l1.length >= 1 && l1.every(r => r.completed)) {
+    const elimPlayers: Array<string | null> = []
+    
+    // Collect 3rd and 4th place from all Loser bracket 1 races
+    for (const race of l1) {
+      elimPlayers.push(getPlacement(race, 2)) // 3rd place
+      elimPlayers.push(getPlacement(race, 3)) // 4th place
+    }
+    
+    // If we don't have enough eliminated players (need at least 3), 
+    // fill with 2nd place finishers from Loser bracket 1
+    const validElimPlayers = elimPlayers.filter(p => p !== null)
+    if (validElimPlayers.length < 3 && validElimPlayers.length > 0) {
+      for (const race of l1) {
+        if (validElimPlayers.length >= 4) break
+        const secondPlace = getPlacement(race, 1)
+        if (secondPlace && !elimPlayers.includes(secondPlace)) {
+          elimPlayers.push(secondPlace)
+        }
+      }
+    }
+    
+    await ensureConsolation(elimPlayers, 0)
   }
 
   // Qual finale: 2 losers from winner bracket finale + 2 winners from loser bracket 2
@@ -593,11 +708,10 @@ const shouldShowIndicator = (round: string, position: number): boolean => {
 }
 
 const getExpectedRaceCount = (round: string): number => {
-  const playerCount = players.value.length
-  
   switch (round) {
     case 'Winner bracket 1':
-      return Math.ceil(playerCount / 4)
+      // Return actual count of W1 races (created at start, never changes)
+      return getRoundRacesSorted('Winner bracket 1').length || 0
     case 'Winner bracket 2':
       return 2
     case 'Winner bracket finale':
@@ -695,6 +809,48 @@ const movePlayerDown = (index: number) => {
   editingPlacements.value[index + 1] = editingPlacements.value[index]
   editingPlacements.value[index] = temp
 }
+
+const openSwapModal = (raceId: string, playerIndex: number) => {
+  swapRaceId.value = raceId
+  swapPlayerIndex.value = playerIndex
+  swapModalOpen.value = true
+}
+
+const closeSwapModal = () => {
+  swapModalOpen.value = false
+  swapRaceId.value = null
+  swapPlayerIndex.value = null
+}
+
+const swapPlayer = async (newPlayerId: string) => {
+  if (!swapRaceId.value || swapPlayerIndex.value === null) return
+  
+  const race = races.value.find(r => r.id === swapRaceId.value)
+  if (!race || race.completed) return
+  
+  // Update the player in the race
+  const updatedPlayers = [...race.players]
+  updatedPlayers[swapPlayerIndex.value] = newPlayerId
+  race.players = updatedPlayers
+  
+  // Save to database
+  await bracketStore.saveRace(race as BracketRaceLocal)
+  
+  // Refresh display
+  refreshKey.value++
+  closeSwapModal()
+}
+
+const availablePlayersForSwap = computed(() => {
+  if (!swapRaceId.value) return []
+  
+  const race = races.value.find(r => r.id === swapRaceId.value)
+  if (!race) return []
+  
+  // Filter out jokers and players already in this race
+  return players.value.filter(p => !isJoker(p.id) && !race.players.includes(p.id))
+})
+
 </script>
 
 <template>
@@ -839,7 +995,7 @@ const movePlayerDown = (index: number) => {
           {{ bracketStore.loading ? 'Creating...' : 'Start Tournament' }}
         </button>
         <p class="text-sm text-muted mt-4 text-center">
-          Add a minimum of 4 players to start
+          A minimum of 12 players is required for this tournament style to work.
         </p>
       </div>
     </div>
@@ -893,15 +1049,49 @@ const movePlayerDown = (index: number) => {
                   :get-position-indicator="getPositionIndicator"
                   :should-show-indicator="shouldShowIndicator"
                   :get-race-rows="getRaceRows"
+                  :open-swap-modal="openSwapModal"
                   @start-edit="startEditingRace(race!.id)"
                   @move-up="movePlayerUp"
                   @move-down="movePlayerDown"
                   @save="saveRaceResult"
                   @cancel="cancelEditingRace"
+                  @swap-player="openSwapModal"
                 />
               </div>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Swap Player Modal -->
+    <div
+      v-if="swapModalOpen"
+      class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+      @click="closeSwapModal"
+    >
+      <div
+        class="bg-white rounded-lg p-6 max-w-md w-full mx-4 max-h-[80vh] overflow-y-auto"
+        @click.stop
+      >
+        <h3 class="text-lg font-semibold mb-4">Swap Player</h3>
+        <p class="text-sm text-muted mb-4">
+          Select a replacement player:
+        </p>
+        <div class="space-y-2">
+          <button
+            v-for="player in availablePlayersForSwap"
+            :key="player.id"
+            @click="swapPlayer(player.id)"
+            class="w-full text-left px-4 py-3 border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-colors"
+          >
+            <div class="font-medium">{{ player.name }}</div>
+          </button>
+        </div>
+        <div class="mt-4 flex justify-end">
+          <button @click="closeSwapModal" class="btn btn-ghost">
+            Cancel
+          </button>
         </div>
       </div>
     </div>

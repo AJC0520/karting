@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArrowRight, ArrowDown, X } from 'lucide-vue-next'
+import { ArrowRight, ArrowDown, X, RefreshCw } from 'lucide-vue-next'
 
 interface BracketPlayer {
   id: string
@@ -32,6 +32,7 @@ const props = defineProps<{
   getPositionIndicator: (round: string, position: number) => { type: 'icon' | 'text' | null; value: string }
   shouldShowIndicator: (round: string, position: number) => boolean
   getRaceRows: (race: BracketRace | null, round: string, raceIndex: number) => RaceRow[]
+  openSwapModal?: (raceId: string, playerIndex: number) => void
 }>()
 
 const emit = defineEmits<{
@@ -40,6 +41,7 @@ const emit = defineEmits<{
   moveDown: [index: number]
   save: []
   cancel: []
+  swapPlayer: [raceId: string, playerIndex: number]
 }>()
 </script>
 
@@ -108,7 +110,7 @@ const emit = defineEmits<{
     <!-- View mode -->
     <div v-else class="space-y-1">
       <div
-        v-for="row in getRaceRows(race, round, raceIndex)"
+        v-for="(row, rowIndex) in getRaceRows(race, round, raceIndex)"
         :key="row.id"
         class="flex items-center gap-2 rounded px-2 py-1 text-xs font-semibold border"
         :class="race?.completed
@@ -121,6 +123,17 @@ const emit = defineEmits<{
           {{ row.placement }}.
         </span>
         <span class="truncate flex-1">{{ row.name }}</span>
+        
+        <!-- Swap button (only for incomplete races and real players) -->
+        <button
+          v-if="race && !race.completed && openSwapModal && row.name !== 'TBD'"
+          @click.stop="emit('swapPlayer', race.id, rowIndex)"
+          class="p-0.5 hover:bg-black/10 rounded transition-colors"
+          title="Swap player"
+        >
+          <RefreshCw :size="12" />
+        </button>
+        
         <ArrowRight v-if="race?.completed && shouldShowIndicator(round, row.placement) && getPositionIndicator(round, row.placement).type === 'icon' && getPositionIndicator(round, row.placement).value === 'arrow-right'" :size="12" class="flex-shrink-0" />
         <ArrowDown v-if="race?.completed && shouldShowIndicator(round, row.placement) && getPositionIndicator(round, row.placement).type === 'icon' && getPositionIndicator(round, row.placement).value === 'arrow-down'" :size="12" class="flex-shrink-0" />
         <X v-if="race?.completed && shouldShowIndicator(round, row.placement) && getPositionIndicator(round, row.placement).type === 'icon' && getPositionIndicator(round, row.placement).value === 'x'" :size="12" class="flex-shrink-0" />
