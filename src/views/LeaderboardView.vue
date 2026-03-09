@@ -190,12 +190,13 @@ const longestStreak = computed(() => {
             helper: stats.firstLoser ? `${stats.firstLoser.secondPlaces} second places` : undefined,
             description: 'Player with the most 2nd place finishes',
           },
-        ].concat(stats.mostBlueShellBonuses ? [{
-          label: 'Blue Shell Warrior',
-          value: stats.mostBlueShellBonuses.player.name,
-          helper: `${stats.mostBlueShellBonuses.bonuses} bonus${stats.mostBlueShellBonuses.bonuses !== 1 ? 'es' : ''}`,
-          description: 'Player who earned the most blue shell bonuses (hit by blue shell but still won)',
-        }] : [])"
+          {
+            label: 'Blue Shell Warrior',
+            value: stats.mostBlueShellBonuses?.player.name ?? '-',
+            helper: stats.mostBlueShellBonuses ? `${stats.mostBlueShellBonuses.bonuses} bonus${stats.mostBlueShellBonuses.bonuses !== 1 ? 'es' : ''}` : '0 bonuses',
+            description: 'Player who earned the most blue shell bonuses (hit by blue shell but still won)',
+          },
+        ]"
       />
     </div>
   </section>
