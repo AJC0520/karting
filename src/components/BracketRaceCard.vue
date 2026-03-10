@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ArrowRight, ArrowDown, X, RefreshCw } from 'lucide-vue-next'
+import { ref } from 'vue'
+import { ArrowRight, ArrowDown, X, RefreshCw, GripVertical } from 'lucide-vue-next'
 
 interface BracketPlayer {
   id: string
@@ -13,6 +14,7 @@ interface BracketRace {
   players: string[]
   placements: string[]
   completed: boolean
+  joker_mimics?: Record<string, string> // Maps joker ID to player ID they're mimicking
 }
 
 interface RaceRow {
@@ -39,11 +41,64 @@ const emit = defineEmits<{
   startEdit: []
   moveUp: [index: number]
   moveDown: [index: number]
+  reorder: [fromIndex: number, toIndex: number]
   save: []
   cancel: []
   swapPlayer: [raceId: string, playerIndex: number]
 }>()
-</script>
+
+// Drag and drop state
+const draggedIndex = ref<number | null>(null)
+const dragOverIndex = ref<number | null>(null)
+
+const handleDragStart = (index: number) => {
+  draggedIndex.value = index
+}
+
+const handleDragOver = (event: DragEvent, index: number) => {
+  event.preventDefault()
+  dragOverIndex.value = index
+}
+
+const handleDragLeave = () => {
+  dragOverIndex.value = null
+}
+
+const handleDrop = (event: DragEvent, toIndex: number) => {
+  event.preventDefault()
+  
+  if (draggedIndex.value !== null && draggedIndex.value !== toIndex) {
+    emit('reorder', draggedIndex.value, toIndex)
+  }
+  
+  draggedIndex.value = null
+  dragOverIndex.value = null
+}
+
+const handleDragEnd = () => {
+  draggedIndex.value = null
+  dragOverIndex.value = null
+}
+
+// Helper to check if a player is a joker
+const isJoker = (playerId: string): boolean => {
+  return playerId?.startsWith('joker_') ?? false
+}
+
+// Helper to get the mimic message for a joker
+const getMimicMessage = (playerId: string): string => {
+  if (!props.race?.joker_mimics || !isJoker(playerId)) {
+    return ''
+  }
+  
+  const mimicTargetId = props.race.joker_mimics[playerId]
+  if (mimicTargetId) {
+    const mimicTarget = props.getPlayerById(mimicTargetId)
+    return mimicTarget ? ` mimics ${mimicTarget.name}` : ''
+  }
+  
+  return ''
+}</script>
 
 <template>
   <div
@@ -63,13 +118,24 @@ const emit = defineEmits<{
 
     <!-- Editing mode -->
     <div v-if="race && isEditing" class="space-y-2" @click.stop>
-      <div class="text-[9px] text-muted mb-2">Use arrows to swap position</div>
+      <div class="text-[9px] text-muted mb-2">Drag to reorder or use arrows</div>
       <div
         v-for="(playerId, index) in editingPlacements"
         :key="playerId"
-        class="flex items-center gap-1.5 p-1.5 rounded border"
-        :class="getPositionColor(round, index + 1)"
+        draggable="true"
+        @dragstart="handleDragStart(index)"
+        @dragover="handleDragOver($event, index)"
+        @dragleave="handleDragLeave"
+        @drop="handleDrop($event, index)"
+        @dragend="handleDragEnd"
+        class="flex items-center gap-1.5 p-1.5 rounded border cursor-move transition-all"
+        :class="[
+          getPositionColor(round, index + 1),
+          draggedIndex === index ? 'opacity-50 scale-95' : '',
+          dragOverIndex === index && draggedIndex !== index ? 'border-blue-500 border-2' : ''
+        ]"
       >
+        <GripVertical :size="14" class="text-gray-400 flex-shrink-0" />
         <div class="flex flex-col gap-0.5">
           <button
             @click="emit('moveUp', index)"
@@ -91,7 +157,15 @@ const emit = defineEmits<{
         <div class="font-bold text-xs w-5 text-center">
           {{ index + 1 }}.
         </div>
-        <span class="text-xs font-semibold truncate flex-1">{{ getPlayerById(playerId)?.name }}</span>
+        <div class="flex-1 truncate flex flex-col">
+          <span class="text-xs font-semibold">{{ getPlayerById(playerId)?.name }}</span>
+          <span 
+            v-if="getMimicMessage(playerId)" 
+            class="text-[9px] text-purple-600 italic font-normal"
+          >
+            {{ getMimicMessage(playerId) }}
+          </span>
+        </div>
         <ArrowRight v-if="shouldShowIndicator(round, index + 1) && getPositionIndicator(round, index + 1).type === 'icon' && getPositionIndicator(round, index + 1).value === 'arrow-right'" :size="12" class="flex-shrink-0" />
         <ArrowDown v-if="shouldShowIndicator(round, index + 1) && getPositionIndicator(round, index + 1).type === 'icon' && getPositionIndicator(round, index + 1).value === 'arrow-down'" :size="12" class="flex-shrink-0" />
         <X v-if="shouldShowIndicator(round, index + 1) && getPositionIndicator(round, index + 1).type === 'icon' && getPositionIndicator(round, index + 1).value === 'x'" :size="12" class="flex-shrink-0" />
@@ -122,13 +196,21 @@ const emit = defineEmits<{
         <span class="w-4 text-[10px] font-semibold">
           {{ row.placement }}.
         </span>
-        <span class="truncate flex-1">{{ row.name }}</span>
+        <div class="truncate flex-1 flex flex-col">
+          <span>{{ row.name }}</span>
+          <span 
+            v-if="race && getMimicMessage(race.players[rowIndex])" 
+            class="text-[9px] text-purple-600 italic font-normal"
+          >
+            {{ getMimicMessage(race.players[rowIndex]) }}
+          </span>
+        </div>
         
         <!-- Swap button (only for incomplete races and real players) -->
         <button
           v-if="race && !race.completed && openSwapModal && row.name !== 'TBD'"
           @click.stop="emit('swapPlayer', race.id, rowIndex)"
-          class="p-0.5 hover:bg-black/10 rounded transition-colors"
+          class="p-0.5 hover:bg-black/10 rounded transition-color"
           title="Swap player"
         >
           <RefreshCw :size="12" />

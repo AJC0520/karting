@@ -29,6 +29,7 @@ export interface BracketRaceLocal {
   players: string[]
   placements: string[]
   completed: boolean
+  joker_mimics?: Record<string, string> // Maps joker ID to player ID they're mimicking
 }
 
 interface BracketState {

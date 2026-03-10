@@ -19,6 +19,7 @@ interface BracketRace {
   players: string[]
   placements: string[] // Ordered by finish position
   completed: boolean
+  joker_mimics?: Record<string, string> // Maps joker ID to player ID they're mimicking
 }
 
 const players = ref<BracketPlayer[]>([])
@@ -51,6 +52,23 @@ const createJoker = (): BracketPlayer => {
   }
   players.value.push(joker)
   return joker
+}
+
+// Helper to assign joker mimics for a race
+const assignJokerMimics = (racePlayerIds: string[]): Record<string, string> => {
+  const jokerMimics: Record<string, string> = {}
+  const jokers = racePlayerIds.filter(id => isJoker(id))
+  const nonJokers = racePlayerIds.filter(id => !isJoker(id))
+  
+  // For each joker, randomly assign a non-joker player to mimic
+  for (const jokerId of jokers) {
+    if (nonJokers.length > 0) {
+      const randomIndex = Math.floor(Math.random() * nonJokers.length)
+      jokerMimics[jokerId] = nonJokers[randomIndex]
+    }
+  }
+  
+  return jokerMimics
 }
 
 // Load tournaments on mount
@@ -199,6 +217,9 @@ const startTournament = async () => {
         racePlayerIds.push(joker.id)
       }
       
+      // Assign joker mimics
+      const jokerMimics = assignJokerMimics(racePlayerIds)
+      
       const race: BracketRace = {
         id: `race${Date.now()}_${slot}`,
         round: 'Winner bracket 1',
@@ -206,6 +227,7 @@ const startTournament = async () => {
         players: racePlayerIds,
         placements: [],
         completed: false,
+        joker_mimics: jokerMimics,
       }
       races.value.push(race)
       
@@ -274,10 +296,14 @@ const ensureRace = async (round: string, slot: number, playerIds: Array<string |
     playersWithJokers.push(joker.id)
   }
   
+  // Assign joker mimics
+  const jokerMimics = assignJokerMimics(playersWithJokers)
+  
   const existing = races.value.find(r => r.round === round && r.slot === slot)
   if (existing) {
     if (!existing.completed) {
       existing.players = playersWithJokers
+      existing.joker_mimics = jokerMimics
     }
     return
   }
@@ -288,6 +314,7 @@ const ensureRace = async (round: string, slot: number, playerIds: Array<string |
     players: playersWithJokers,
     placements: [],
     completed: false,
+    joker_mimics: jokerMimics,
   }
   races.value.push(newRace)
   
@@ -810,6 +837,13 @@ const movePlayerDown = (index: number) => {
   editingPlacements.value[index] = temp
 }
 
+const reorderPlayers = (fromIndex: number, toIndex: number) => {
+  const newPlacements = [...editingPlacements.value]
+  const [movedPlayer] = newPlacements.splice(fromIndex, 1)
+  newPlacements.splice(toIndex, 0, movedPlayer)
+  editingPlacements.value = newPlacements
+}
+
 const openSwapModal = (raceId: string, playerIndex: number) => {
   swapRaceId.value = raceId
   swapPlayerIndex.value = playerIndex
@@ -828,12 +862,74 @@ const swapPlayer = async (newPlayerId: string) => {
   const race = races.value.find(r => r.id === swapRaceId.value)
   if (!race || race.completed) return
   
-  // Update the player in the race
+  // Get the old player ID being swapped out
+  const oldPlayerId = race.players[swapPlayerIndex.value]
+  
+  // Find if the new player is currently in another race
+  const otherRace = races.value.find(r => 
+    r.id !== race.id && 
+    !r.completed && 
+    r.players.includes(newPlayerId)
+  )
+  
+  // Update the first race
   const updatedPlayers = [...race.players]
   updatedPlayers[swapPlayerIndex.value] = newPlayerId
   race.players = updatedPlayers
   
-  // Save to database
+  // Update joker mimics in the first race
+  if (race.joker_mimics && oldPlayerId) {
+    const updatedMimics = { ...race.joker_mimics }
+    
+    // Find any joker that was mimicking the old player
+    for (const [jokerId, mimicTargetId] of Object.entries(updatedMimics)) {
+      if (mimicTargetId === oldPlayerId) {
+        // Reassign this joker to mimic a different non-joker player
+        const availableTargets = race.players.filter(p => p !== jokerId && !isJoker(p))
+        if (availableTargets.length > 0) {
+          const randomIndex = Math.floor(Math.random() * availableTargets.length)
+          updatedMimics[jokerId] = availableTargets[randomIndex]
+        }
+      }
+    }
+    
+    race.joker_mimics = updatedMimics
+  }
+  
+  // If the new player was in another race, perform a true swap
+  if (otherRace && oldPlayerId) {
+    const otherPlayerIndex = otherRace.players.indexOf(newPlayerId)
+    if (otherPlayerIndex !== -1) {
+      // Swap: put the old player in the other race
+      const otherUpdatedPlayers = [...otherRace.players]
+      otherUpdatedPlayers[otherPlayerIndex] = oldPlayerId
+      otherRace.players = otherUpdatedPlayers
+      
+      // Update joker mimics in the other race
+      if (otherRace.joker_mimics && newPlayerId) {
+        const otherUpdatedMimics = { ...otherRace.joker_mimics }
+        
+        // Find any joker that was mimicking the new player
+        for (const [jokerId, mimicTargetId] of Object.entries(otherUpdatedMimics)) {
+          if (mimicTargetId === newPlayerId) {
+            // Reassign this joker to mimic a different non-joker player
+            const availableTargets = otherRace.players.filter(p => p !== jokerId && !isJoker(p))
+            if (availableTargets.length > 0) {
+              const randomIndex = Math.floor(Math.random() * availableTargets.length)
+              otherUpdatedMimics[jokerId] = availableTargets[randomIndex]
+            }
+          }
+        }
+        
+        otherRace.joker_mimics = otherUpdatedMimics
+      }
+      
+      // Save the other race to database
+      await bracketStore.saveRace(otherRace as BracketRaceLocal)
+    }
+  }
+  
+  // Save the first race to database
   await bracketStore.saveRace(race as BracketRaceLocal)
   
   // Refresh display
@@ -847,7 +943,8 @@ const availablePlayersForSwap = computed(() => {
   const race = races.value.find(r => r.id === swapRaceId.value)
   if (!race) return []
   
-  // Filter out jokers and players already in this race
+  // Show all non-joker players except those already in this specific race
+  // (players from other races can now be swapped)
   return players.value.filter(p => !isJoker(p.id) && !race.players.includes(p.id))
 })
 
@@ -1053,6 +1150,7 @@ const availablePlayersForSwap = computed(() => {
                   @start-edit="startEditingRace(race!.id)"
                   @move-up="movePlayerUp"
                   @move-down="movePlayerDown"
+                  @reorder="reorderPlayers"
                   @save="saveRaceResult"
                   @cancel="cancelEditingRace"
                   @swap-player="openSwapModal"
