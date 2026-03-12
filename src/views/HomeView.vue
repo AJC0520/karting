@@ -61,7 +61,12 @@
     <div class="absolute bottom-0 left-0 right-0 race-strip-bg">
       <div class="flex items-center justify-center gap-10 py-6 px-8">
         <RouterLink to="/tournaments" class="mk-menu-btn">TOURNAMENTS</RouterLink>
-        <RouterLink to="/beeriokart" class="mk-menu-btn">BEERIOKART</RouterLink>
+        <RouterLink to="/beeriokart" class="mk-menu-btn beer-btn">
+          <span class="bubble bubble-1"></span>
+          <span class="bubble bubble-2"></span>
+          <span class="bubble bubble-3"></span>
+          BEERIOKART
+        </RouterLink>
       </div>
     </div>
   </div>
@@ -105,5 +110,58 @@
 
 .animate-coin-bob {
   animation: coin-bob 1.6s ease-in-out infinite;
+}
+
+/* Beer button with bubbles */
+.beer-btn {
+  position: relative;
+  background: linear-gradient(135deg, #f5a623 0%, #e8941d 100%) !important;
+  overflow: hidden;
+}
+
+.bubble {
+  position: absolute;
+  background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.7), rgba(255,255,255,0.2));
+  border-radius: 50%;
+  pointer-events: none;
+  animation: bubble-rise 2s ease-in infinite;
+  box-shadow: 0 0 4px rgba(255,255,255,0.5);
+}
+
+.bubble-1 {
+  width: 8px;
+  height: 8px;
+  left: 20%;
+  bottom: 10%;
+  animation-duration: 2s;
+}
+
+.bubble-2 {
+  width: 6px;
+  height: 6px;
+  left: 50%;
+  bottom: 5%;
+  animation-duration: 2.4s;
+  animation-delay: 0.3s;
+}
+
+.bubble-3 {
+  width: 7px;
+  height: 7px;
+  left: 75%;
+  bottom: 8%;
+  animation-duration: 2.2s;
+  animation-delay: 0.6s;
+}
+
+@keyframes bubble-rise {
+  0% { 
+    transform: translateY(0) translateX(0);
+    opacity: 1;
+  }
+  100% { 
+    transform: translateY(-50px) translateX(0);
+    opacity: 0;
+  }
 }
 </style>
