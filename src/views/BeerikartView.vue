@@ -963,7 +963,7 @@ const availablePlayersForSwap = computed(() => {
 <template>
   <div class="content-area">
     <div class="mb-6">
-      <h1 class="text-3xl font-semibold mb-2">🍺 Beeriokart</h1>
+      <h1 class="text-3xl font-semibold mb-2 section-title text-white">🍺 Beeriokart</h1>
     </div>
 
     <!-- Tournament List -->

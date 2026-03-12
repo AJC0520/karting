@@ -39,9 +39,9 @@ const hasDescriptions = computed(() => items.value.some((item) => item.descripti
       <p v-if="item.helper" class="mt-1 text-xs text-muted">{{ item.helper }}</p>
     </div>
   </div>
-  <p v-if="hasDescriptions" class="mt-2 text-xs text-muted">
+  <p v-if="hasDescriptions" class="mt-2 text-xs text-white">
     <span v-if="hoveredItem?.description">
-      <span class="font-semibold text-zinc-800">{{ hoveredItem.label }}:</span>
+      <span class="font-semibold text-white">{{ hoveredItem.label }}:</span>
       {{ hoveredItem.description }}
     </span>
     <span v-else>Hover an achievement to see the description.</span>

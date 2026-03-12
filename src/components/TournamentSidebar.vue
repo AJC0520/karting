@@ -25,8 +25,8 @@ const links = computed(() => [
   <aside class="w-56 shrink-0 flex flex-col gap-1 self-start sticky top-20">
     <!-- Tournament name -->
     <div class="px-3 py-2 mb-1">
-      <p class="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1">Tournament</p>
-      <p class="font-mk text-base text-yellow-400 leading-tight truncate">
+      <p class="text-xs font-semibold text-white uppercase tracking-widest mb-1">Tournament</p>
+      <p class="font-mk text-base section-title leading-tight truncate">
         {{ currentTournament?.name ?? '…' }}
       </p>
     </div>
