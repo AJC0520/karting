@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted } from 'vue'
-import { Trophy, Plus, List, Calendar, CheckCircle2, Trash2 } from 'lucide-vue-next'
+import { Trophy, Plus, List, Calendar, CheckCircle2, Trash2, Map, LoaderPinwheel } from 'lucide-vue-next'
 import { useBracketStore, type BracketPlayer, type BracketRaceLocal } from '@/stores/bracketStore'
 import { useAuthStore } from '@/stores/authStore'
 import { supabase } from '@/lib/supabase'
@@ -8,6 +8,7 @@ import type { Json } from '@/lib/database.types'
 import BracketLegend from '@/components/BracketLegend.vue'
 import BracketPodium from '@/components/BracketPodium.vue'
 import BracketRaceCard from '@/components/BracketRaceCard.vue'
+import MapWheelSpinner from '@/components/MapWheelSpinner.vue'
 
 const bracketStore = useBracketStore()
 const authStore = useAuthStore()
@@ -38,6 +39,15 @@ const jokerCount = ref(0)
 const swapModalOpen = ref(false)
 const swapRaceId = ref<string | null>(null)
 const swapPlayerIndex = ref<number | null>(null)
+
+// Map wheel spinner state
+const showMapSpinner = ref(false)
+const selectedMap = ref<string | null>(null)
+
+const handleMapSelected = (track: string) => {
+  selectedMap.value = track
+  // You can do something with the selected track here, like display it
+}
 
 // Helper to check if a player is a joker
 const isJoker = (playerId: string | null): boolean => {
@@ -1194,4 +1204,21 @@ const availablePlayersForSwap = computed(() => {
       </div>
     </div>
   </div>
+
+  <!-- Floating Map Spinner Button (only show in tournament view) -->
+  <button
+    v-if="currentRound && !showTournamentList && !showNewTournamentForm"
+    @click="showMapSpinner = true"
+    class="fixed bottom-6 right-6 w-14 h-14 bg-purple-600 hover:bg-purple-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all hover:scale-110 z-40"
+    title="Spin for a map"
+  >
+    <LoaderPinwheel size="24"></LoaderPinwheel>
+  </button>
+
+  <!-- Map Wheel Spinner Modal -->
+  <MapWheelSpinner
+    v-if="showMapSpinner"
+    @close="showMapSpinner = false"
+    @selected="handleMapSelected"
+  />
 </template>

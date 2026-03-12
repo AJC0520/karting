@@ -38,7 +38,7 @@ const tournaments = computed(() => store.tournaments)
       <div 
         v-for="tournament in tournaments" 
         :key="tournament.id" 
-        class="card p-5 cursor-pointer hover:shadow-lg transition-shadow"
+        class="card p-5 cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-transform duration-300 transition-shadow"
         @click="router.push(`/t/${tournament.id}/leaderboard`)"
       >
         <h4 class="text-lg font-semibold">{{ tournament.name }}</h4>

@@ -37,7 +37,7 @@ const top4Players = computed(() => {
   return leaderboard.slice(0, 4)
 })
 
-const colors = ['#ef4444', '#f97316', '#3b82f6', '#a855f7'] // red, orange, blue, purple
+const colors = ['#E63946', '#457B9D', '#2DC653', '#F4A261'] // red, blue, green, yellow
 
 // Calculate tournament standings after each race
 const graphData = computed((): PlayerRaceData[] => {
