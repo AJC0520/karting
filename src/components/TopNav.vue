@@ -34,6 +34,8 @@ const navigateTo = (path: string) => {
 const blurDropdown = () => {
   window.setTimeout(() => { showDropdown.value = false }, 150)
 }
+
+const isBeeriokart = computed(() => route.path.startsWith('/beeriokart'))
 </script>
 
 <template>
@@ -42,7 +44,12 @@ const blurDropdown = () => {
 
       <!-- Logo -->
       <RouterLink to="/" class="font-mk text-3xl leading-none shrink-0">
-        <span class="mk-text-orange" style="-webkit-text-stroke: 2px #A96800; text-shadow: 2px 2px 0 #5B2D00;">KART</span><span class="mk-text-red" style="-webkit-text-stroke: 2px #7A0000; text-shadow: 2px 2px 0 #3B0000;">TRACKER</span>
+        <template v-if="isBeeriokart">
+          <span class="mk-text-orange" style="-webkit-text-stroke: 2px #A96800; text-shadow: 2px 2px 0 #5B2D00;">BEERI</span><span class="mk-text-orange" style="-webkit-text-stroke: 2px #A96800; text-shadow: 2px 2px 0 #5B2D00;">O</span><span class="mk-text-red" style="-webkit-text-stroke: 2px #7A0000; text-shadow: 2px 2px 0 #3B0000;">KART</span>
+        </template>
+        <template v-else>
+          <span class="mk-text-orange" style="-webkit-text-stroke: 2px #A96800; text-shadow: 2px 2px 0 #5B2D00;">KART</span><span class="mk-text-red" style="-webkit-text-stroke: 2px #7A0000; text-shadow: 2px 2px 0 #3B0000;">TRACKER</span>
+        </template>
       </RouterLink>
 
       <!-- Desktop nav -->
