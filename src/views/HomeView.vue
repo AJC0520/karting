@@ -1,65 +1,109 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useRouter } from 'vue-router'
-
-import { useAppStore } from '@/stores/appStore'
-import { formatDate } from '@/utils/format'
-
-const store = useAppStore()
-const router = useRouter()
-
-const tournaments = computed(() => store.tournaments)
+// Home splash page
 </script>
 
 <template>
-  <section class="space-y-8">
-    <div class="card p-6">
-      <h2 class="text-2xl font-semibold">Ready for the next season?</h2>
-      <p class="mt-2 text-sm text-muted">
-        Create a tournament, add your players, and keep track of every race across months of sessions.
-      </p>
-      <div class="mt-4">
-        <RouterLink to="/create-tournament" class="btn btn-primary">
-          Create tournament
-        </RouterLink>
+  <div class="relative w-screen h-screen overflow-hidden bg-scene">
+    <!-- Sky image 1 — left side, higher up -->
+    <div
+      class="absolute inset-0"
+      style="
+        background-image: url('/Sky1.png');
+        background-size: 48% auto;
+        background-repeat: no-repeat;
+        background-position: 0% 8%;
+      "
+    />
+    <!-- Sky image 2 — right side, a bit lower -->
+    <div
+      class="absolute inset-0"
+      style="
+        background-image: url('/Sky1.png');
+        background-size: 48% auto;
+        background-repeat: no-repeat;
+        background-position: 100% 22%;
+      "
+    />
+
+    <!-- Grass/ground gradient at bottom -->
+    <div class="absolute inset-0 bg-ground-fade pointer-events-none" />
+
+    <!-- Logo (behind Mario) -->
+    <div class="absolute top-12 left-0 right-0 flex justify-center pointer-events-none select-none" style="z-index: 1;">
+      <h1 class="font-mk leading-none" style="font-size: clamp(5rem, 12vw, 9rem);">
+        <span class="mk-text-orange">KART</span><span class="mk-text-red">TRACKER</span>
+      </h1>
+    </div>
+
+    <!-- Mario character — head pokes in front of the R/T join -->
+    <img
+      src="/Mario.png"
+      alt="Mario"
+      class="absolute object-contain pointer-events-none"
+      style="bottom: 13%; left: 50%; transform: translateX(-62%); height: 56%; z-index: 2;"
+    />
+
+    <!-- Coins — close to Mario's right -->
+    <img
+      src="/Coin 1.png"
+      alt=""
+      class="absolute object-contain pointer-events-none animate-coin-bob"
+      style="bottom: 18%; left: calc(50% + 16%); width: 5%; z-index: 1;"
+    />
+    <img
+      src="/Coin 1.png"
+      alt=""
+      class="absolute object-contain pointer-events-none animate-coin-bob"
+      style="bottom: 26%; left: calc(50% + 24%); width: 6%; animation-delay: 0.4s; z-index: 1;"
+    />
+
+    <!-- Bottom menu strip — racing stripes -->
+    <div class="absolute bottom-0 left-0 right-0 race-strip-bg">
+      <div class="flex items-center justify-center gap-10 py-6 px-8">
+        <RouterLink to="/tournaments" class="mk-menu-btn">TOURNAMENTS</RouterLink>
+        <RouterLink to="/beeriokart" class="mk-menu-btn">BEERIOKART</RouterLink>
       </div>
     </div>
-
-    <div>
-      <h3 class="section-title">Recent tournaments</h3>
-      <p class="subtle">Jump back into leaderboards, players, or race history.</p>
-    </div>
-
-    <div v-if="!tournaments.length" class="card p-6 text-sm text-muted">
-      No tournaments yet. Create one to start tracking results.
-    </div>
-
-    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-      <div 
-        v-for="tournament in tournaments" 
-        :key="tournament.id" 
-        class="card p-5 cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-transform duration-300 transition-shadow"
-        @click="router.push(`/t/${tournament.id}/leaderboard`)"
-      >
-        <h4 class="text-lg font-semibold">{{ tournament.name }}</h4>
-        <p class="mt-1 text-xs text-muted">Created {{ formatDate(tournament.createdAt) }}</p>
-        <div class="mt-3 flex gap-2 text-xs text-muted">
-          <span>{{ tournament.players.length }} players</span>
-          <span>•</span>
-          <span>{{ tournament.races.length }} races</span>
-        </div>
-        <div class="mt-4 flex flex-wrap gap-2" @click.stop>
-          <RouterLink class="btn btn-ghost text-xs" :to="`/t/${tournament.id}/leaderboard`">
-            Leaderboard
-          </RouterLink>
-          <RouterLink class="btn btn-ghost text-xs" :to="`/t/${tournament.id}/races`">
-            Races
-          </RouterLink>
-          <RouterLink class="btn btn-ghost text-xs" :to="`/t/${tournament.id}/players`">
-            Players
-          </RouterLink>
-        </div>
-      </div>
-    </div>
-  </section>
+  </div>
 </template>
+
+<style scoped>
+/* Sky-blue top fading into dark green at the bottom, like MK */
+.bg-scene {
+  background: linear-gradient(
+    to bottom,
+    #5F8FF6 25%,
+    #042104 68%
+  );
+}
+
+/* Racing-stripe bottom bar — diagonal red/white repeating */
+.race-strip-bg {
+  background: repeating-linear-gradient(
+    -45deg,
+    #ffffff 0px,
+    #ffffff 20px,
+    #cc0000 20px,
+    #cc0000 40px
+  );
+  border-top: 4px solid #880000;
+}
+
+/* Darken the lower 40% so the ground reads as shadowed */
+.bg-ground-fade {
+  background: linear-gradient(
+    to bottom,
+    transparent 50%,
+    rgba(0, 0, 0, 0.45) 100%
+  );
+}
+
+@keyframes coin-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-12px); }
+}
+
+.animate-coin-bob {
+  animation: coin-bob 1.6s ease-in-out infinite;
+}
+</style>

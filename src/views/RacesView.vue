@@ -4,7 +4,6 @@ import { useRoute, useRouter } from 'vue-router'
 
 import RaceForm from '@/components/RaceForm.vue'
 import RaceList from '@/components/RaceList.vue'
-import TournamentTabs from '@/components/TournamentTabs.vue'
 import { useAppStore } from '@/stores/appStore'
 import type { Race } from '@/types'
 
@@ -67,16 +66,15 @@ const deleteRace = (race: Race) => {
 
 <template>
   <section v-if="tournament" class="space-y-8">
-    <header class="space-y-4">
+    <header class="space-y-2">
       <div class="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h2 class="text-3xl font-semibold">{{ tournament.name }}</h2>
+          <h2 class="text-3xl font-semibold section-title text-white">{{ tournament.name }}</h2>
         </div>
         <button class="btn btn-primary" type="button" @click="router.push(`/t/${tournament.id}/add-race`)">
           Add race
         </button>
       </div>
-      <TournamentTabs />
     </header>
 
     <div class="card p-4">

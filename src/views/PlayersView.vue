@@ -4,7 +4,6 @@ import { useRoute } from 'vue-router'
 
 import PlayerForm from '@/components/PlayerForm.vue'
 import StatsCards from '@/components/StatsCards.vue'
-import TournamentTabs from '@/components/TournamentTabs.vue'
 import { useAppStore } from '@/stores/appStore'
 import { formatDateTime, formatNumber } from '@/utils/format'
 import { getPlayerStats } from '@/utils/stats'
@@ -69,11 +68,10 @@ const removePlayer = (player: Player) => {
 
 <template>
   <section v-if="tournament" class="space-y-8">
-    <header class="space-y-4">
+    <header class="space-y-2">
       <div>
-        <h2 class="text-3xl font-semibold">{{ tournament.name }}</h2>
+        <h2 class="text-3xl font-semibold section-title text-white">{{ tournament.name }}</h2>
       </div>
-      <TournamentTabs />
     </header>
 
     <div class="grid gap-6 lg:grid-cols-2">

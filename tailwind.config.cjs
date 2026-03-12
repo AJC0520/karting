@@ -13,7 +13,7 @@ module.exports = {
         ring: 'rgb(var(--ring) / <alpha-value>)',
       },
       fontFamily: {
-        display: ['Fraunces', 'serif'],
+        mk: ['Bowlby One SC', 'sans-serif'],
         sans: ['Space Grotesk', 'system-ui', 'sans-serif'],
       },
       boxShadow: {

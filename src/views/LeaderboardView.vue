@@ -4,7 +4,6 @@ import { useRoute } from 'vue-router'
 
 import PodiumGraph from '@/components/PodiumGraph.vue'
 import StatsCards from '@/components/StatsCards.vue'
-import TournamentTabs from '@/components/TournamentTabs.vue'
 import { useAppStore } from '@/stores/appStore'
 import { formatNumber } from '@/utils/format'
 import { getLeaderboard, getTournamentStats } from '@/utils/stats'
@@ -80,21 +79,10 @@ const longestStreak = computed(() => {
 
 <template>
   <section v-if="tournament" class="space-y-8">
-    <header class="space-y-4">
-      <div class="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h2 class="text-3xl font-semibold">{{ tournament.name }}</h2>
-        </div>
-        <div class="text-sm text-muted">
-          <span v-if="leaderGap">Leading by {{ formatNumber(leaderGap, 2) }} points</span>
-          <span v-else>No races yet</span>
-        </div>
-      </div>
-      <TournamentTabs />
-    </header>
 
     <!-- Podium Display -->
     <div v-if="topFour.length > 0" class="card p-8">
+      <span v-if="leaderGap">Leading by {{ formatNumber(leaderGap, 2) }} points</span>
       <div class="flex items-end justify-center gap-4 max-w-4xl mx-auto">
         <div
           v-for="entry in podiumOrder"

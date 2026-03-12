@@ -68,8 +68,7 @@ const cancel = () => {
     <header>
       <div class="flex items-center justify-between">
         <div>
-          <p class="text-xs uppercase tracking-[0.3em] text-muted">Create new</p>
-          <h2 class="text-3xl font-semibold">Tournament</h2>
+          <h2 class="text-3xl font-semibold section-title text-white">Create new Tournament</h2>
         </div>
         <button @click="cancel" class="btn btn-ghost">Cancel</button>
       </div>

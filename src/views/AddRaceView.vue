@@ -3,7 +3,6 @@ import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import RaceForm from '@/components/RaceForm.vue'
-import TournamentTabs from '@/components/TournamentTabs.vue'
 import { useAppStore } from '@/stores/appStore'
 import type { Race } from '@/types'
 
@@ -22,11 +21,10 @@ const saveRace = (race: Race) => {
 
 <template>
   <section v-if="tournament" class="space-y-8">
-    <header class="space-y-4">
+    <header class="space-y-2">
       <div>
-        <h2 class="text-3xl font-semibold">{{ tournament.name }}</h2>
+        <h2 class="text-3xl font-semibold section-title text-white">{{ tournament.name }}</h2>
       </div>
-      <TournamentTabs />
     </header>
 
     <div class="card p-6">
