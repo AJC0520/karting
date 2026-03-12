@@ -1,7 +1,7 @@
 <template>
   <div
     class="min-h-screen flex items-center justify-center bg-cover bg-center py-12 px-4"
-    style="background-image: url('/Sky1.png')"
+    style="background-color: lightblue;"
   >
     <div class="w-full max-w-md">
       <!-- Logo -->
