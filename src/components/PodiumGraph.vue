@@ -461,7 +461,7 @@ const hideLargestGapTooltip = () => {
             />
           </g>
           <g v-if="largestGap">
-            <line
+              <line
               :x1="largestGap.x"
               :y1="largestGap.yTop"
               :x2="largestGap.x"

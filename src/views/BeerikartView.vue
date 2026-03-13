@@ -1219,3 +1219,124 @@ const availablePlayersForSwap = computed(() => {
     @selected="handleMapSelected"
   />
 </template>
+
+
+<style scoped>
+.beer-background {
+  position: relative;
+  min-height: 100vh;
+  width: 100%;
+  overflow: hidden;
+}
+
+/* Foam layer at the top */
+.beer-foam {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 25%;
+  background: linear-gradient(180deg, #f5f5dc 0%, #fef3c7 25%, #fde68a 100%);
+  z-index: 0;
+}
+
+/* Beer color background */
+.beer-background::before {
+  content: '';
+  position: absolute;
+  top: 25%;
+  left: 0;
+  width: 100%;
+  height: 75%;
+  background: linear-gradient(180deg, #f5a623 0%, #d4860a 50%, #b8720a 100%);
+  z-index: 0;
+}
+
+/* Content area stays above background */
+.content-area {
+  position: relative;
+  z-index: 10;
+}
+
+/* Floating bubbles */
+.beer-bubble {
+  position: absolute;
+  background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.4));
+  border-radius: 50%;
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.6);
+  animation: beer-bubble-rise 6s infinite ease-in;
+  z-index: 5;
+}
+
+/* Position and timing for each bubble */
+.bubble-1 {
+  width: 12px;
+  height: 12px;
+  left: 10%;
+  bottom: 20%;
+  animation-delay: 0s;
+  animation-duration: 6s;
+}
+
+.bubble-2 {
+  width: 8px;
+  height: 8px;
+  left: 25%;
+  bottom: 30%;
+  animation-delay: 1s;
+  animation-duration: 7s;
+}
+
+.bubble-3 {
+  width: 10px;
+  height: 10px;
+  left: 50%;
+  bottom: 15%;
+  animation-delay: 2s;
+  animation-duration: 6s;
+}
+
+.bubble-4 {
+  width: 14px;
+  height: 14px;
+  left: 70%;
+  bottom: 25%;
+  animation-delay: 0.5s;
+  animation-duration: 8s;
+}
+
+.bubble-5 {
+  width: 9px;
+  height: 9px;
+  left: 85%;
+  bottom: 10%;
+  animation-delay: 1.5s;
+  animation-duration: 7s;
+}
+
+@keyframes beer-bubble-rise {
+  0% {
+    transform: translateY(0) translateX(0);
+    opacity: 1;
+  }
+  25% {
+    transform: translateY(-200px) translateX(20px);
+    opacity: 1;
+  }
+  75% {
+    transform: translateY(-600px) translateX(40px);
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(-800px) translateX(50px);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .beer-bubble {
+    animation: none;
+    opacity: 0.3;
+  }
+}
+</style>
