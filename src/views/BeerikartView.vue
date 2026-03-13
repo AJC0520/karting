@@ -1017,7 +1017,6 @@ const availablePlayersForSwap = computed(() => {
                     {{ new Date(tournament.created_at).toLocaleDateString() }}
                   </span>
                   <span>{{ (tournament.players as any[]).length }} players</span>
-                  <span v-if="tournament.current_round">{{ tournament.current_round }}</span>
                 </div>
               </div>
               <div class="flex items-center gap-2">

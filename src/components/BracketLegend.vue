@@ -58,7 +58,7 @@ import { Bold, RefreshCw } from "lucide-vue-next";
           <strong
             >grand finale, qualification finale, or the winner bracket
             finale</strong
-          >, and you want to replace them with a real player. It can also be
+          >, or if a joker ends up in the <strong>consolation match</strong>, and you want to replace them with a real player. It can also be
           used to create specific matchups between players. When swapping, any
           joker that was mimicking either player will be automatically
           reassigned to mimic another player in their race.
