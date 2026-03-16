@@ -118,11 +118,11 @@ const spinWheel = () => {
 
 <template>
   <div
-    class="fixed inset-0 bg-black/70 flex items-end justify-end z-50 p-4"
+    class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
     @click="emit('close')"
   >
     <div
-      class="bg-white rounded-lg p-8 w-[580px] relative mb-4 mr-4"
+      class="bg-white rounded-lg p-6 sm:p-8 w-full max-w-[580px] max-h-[calc(100vh-2rem)] overflow-y-auto overflow-x-hidden relative"
       @click.stop
     >
       <!-- Close button -->
@@ -136,7 +136,7 @@ const spinWheel = () => {
       <h2 class="text-2xl font-bold mb-6 text-center">🎯 Spin for a Map!</h2>
 
       <!-- Wheel Container -->
-      <div class="relative mx-auto flex items-center justify-center" style="width: 500px; height: 500px;">
+      <div class="relative mx-auto flex items-center justify-center" style="width: min(78vw, 60vh, 500px); height: min(78vw, 60vh, 500px);">
         <!-- Pointer arrow at top -->
         <div class="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-2 z-10">
           <div class="w-0 h-0 border-l-[15px] border-l-transparent border-r-[15px] border-r-transparent border-t-[25px] border-t-red-600"></div>
@@ -185,7 +185,7 @@ const spinWheel = () => {
       <div class="mt-6 text-center">
         <div v-if="showWinner && selectedTrack" class="mb-4">
           <div class="text-4xl mb-2"></div>
-          <div class="text-2xl font-bold text-purple-600 mb-4">{{ selectedTrack }}</div>
+          <div class="text-2xl font-bold text-purple-600 mb-4 break-words leading-tight px-2">{{ selectedTrack }}</div>
         </div>
         <button
           @click="spinWheel"
