@@ -80,6 +80,73 @@
     @apply text-sm text-muted text-white;
   }
 
+  /* --- Beeriokart arcade kit ------------------------------- */
+  /* Chunky, hard-shadowed surfaces matching the .mk-menu-btn language used
+     on the home screen. Flat plastic: no blur, no soft shadows. */
+
+  .mk-panel {
+    @apply rounded-xl border-[3px] border-ink bg-white;
+    box-shadow: 0 5px 0 rgba(18, 24, 40, 0.9);
+  }
+
+  .mk-panel-sm {
+    @apply rounded-lg border-2 border-ink/20 bg-white;
+    box-shadow: 0 3px 0 rgba(18, 24, 40, 0.12);
+  }
+
+  /* Solid colour signboard that caps a panel. */
+  .mk-plate {
+    @apply border-b-[3px] border-ink px-3 py-1.5 font-mk text-[13px] uppercase tracking-wider text-white;
+    text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.35);
+  }
+
+  .mk-plate-green { background: linear-gradient(180deg, #34b34f 0%, #1d8a37 100%); }
+  .mk-plate-red   { background: linear-gradient(180deg, #e63030 0%, #b01010 100%); }
+  .mk-plate-gold  { background: linear-gradient(180deg, #f9c22e 0%, #e09000 100%); }
+
+  /* Chunky rank tile - the number in front of a driver's name. */
+  .mk-rank {
+    @apply flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md border-2 border-ink font-mk text-[11px] leading-none;
+  }
+
+  /* Small status flag, e.g. DONE / READY. */
+  .mk-flag {
+    @apply inline-flex items-center gap-1 rounded-md border-2 border-ink px-1.5 py-0.5 font-mk text-[9px] uppercase leading-none tracking-wide;
+  }
+
+  .mk-flag-done  { @apply bg-green-400 text-green-950; }
+  .mk-flag-ready { @apply bg-amber-300 text-amber-950; }
+  .mk-flag-tbd   { @apply border-dashed border-ink/30 bg-transparent text-ink/40; }
+
+  /* Outcome badge - says in words where a finishing position sends a driver. */
+  .mk-outcome {
+    @apply flex-shrink-0 rounded border px-1 py-px text-[8px] font-bold uppercase leading-tight tracking-wide;
+  }
+
+  .mk-outcome-adv   { @apply border-green-700/40 bg-green-600 text-white; }
+  .mk-outcome-drop  { @apply border-amber-800/50 bg-amber-500 text-amber-950; }
+  .mk-outcome-final { @apply border-yellow-700/50 bg-yellow-300 text-yellow-950; }
+  .mk-outcome-out   { @apply border-red-800/40 bg-red-600 text-white; }
+  .mk-outcome-none  { @apply border-slate-400/50 bg-slate-200 text-slate-700; }
+
+  /* Driver row - the repeated unit inside every race card. */
+  /* Runs edge-to-edge inside the race card - the card's own border and
+     rounded corners frame the block, so rows carry no outer gap of their own. */
+  .mk-driver {
+    @apply relative flex items-center gap-1.5 border-b px-2 py-1 text-xs transition-opacity last:border-b-0;
+  }
+
+  /* Checkered finish-line texture for the grand finale. */
+  .mk-checker {
+    background-color: #ffffff;
+    background-image:
+      linear-gradient(45deg, #121828 25%, transparent 25%, transparent 75%, #121828 75%),
+      linear-gradient(45deg, #121828 25%, transparent 25%, transparent 75%, #121828 75%);
+    background-size: 8px 8px;
+    background-position: 0 0, 4px 4px;
+  }
+
+
   /* ─── Mario Kart logo text ───────────────── */
   .mk-text-orange {
     color: #F4A700;

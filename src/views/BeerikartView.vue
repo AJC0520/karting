@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted } from 'vue'
-import { Trophy, Plus, List, Calendar, CheckCircle2, Trash2, Map, LoaderPinwheel } from 'lucide-vue-next'
+import { Trophy, Plus, List, Calendar, CheckCircle2, Trash2, Map, LoaderPinwheel, HelpCircle } from 'lucide-vue-next'
 import { useBracketStore, type BracketPlayer, type BracketRaceLocal } from '@/stores/bracketStore'
 import { useAuthStore } from '@/stores/authStore'
 import { supabase } from '@/lib/supabase'
@@ -8,7 +8,15 @@ import type { Json } from '@/lib/database.types'
 import BracketLegend from '@/components/BracketLegend.vue'
 import BracketPodium from '@/components/BracketPodium.vue'
 import BracketRaceCard from '@/components/BracketRaceCard.vue'
+import BracketFlow from '@/components/BracketFlow.vue'
+import RaceEditorPanel from '@/components/RaceEditorPanel.vue'
 import MapWheelSpinner from '@/components/MapWheelSpinner.vue'
+import { buildPlayerColors } from '@/utils/playerColors'
+import {
+  getPositionColor,
+  getOutcome,
+  isElimination,
+} from '@/utils/bracketDisplay'
 
 const bracketStore = useBracketStore()
 const authStore = useAuthStore()
@@ -43,6 +51,31 @@ const swapPlayerIndex = ref<number | null>(null)
 // Map wheel spinner state
 const showMapSpinner = ref(false)
 const selectedMap = ref<string | null>(null)
+
+// Bracket presentation state
+const showRules = ref(false)
+const focusedPlayerId = ref<string | null>(null)
+
+const playerColors = computed(() => buildPlayerColors(players.value))
+
+/** The race currently open in the side editor, if any. */
+const editingRace = computed(() =>
+  editingRaceId.value ? races.value.find(r => r.id === editingRaceId.value) ?? null : null,
+)
+
+/**
+ * Colours for the setup form, keyed by input slot rather than by player id -
+ * lets a host see the grid fill with each driver's racing colour as they type.
+ */
+const setupColors = computed(() => {
+  const filled = playerNames.value.map((name, index) => ({ id: `slot${index}`, name }))
+  const colors = buildPlayerColors(filled)
+  return filled.map(slot => colors[slot.id])
+})
+
+const setHoveredPlayer = (playerId: string | null) => {
+  focusedPlayerId.value = playerId
+}
 
 const handleMapSelected = (track: string) => {
   selectedMap.value = track
@@ -613,136 +646,31 @@ const getRaceRows = (race: BracketRace | null, round?: string, slot?: number) =>
         // Show potential players with their names
         return potentialPlayers.map((playerId, index) => ({
           id: `potential_${round}_${slot}_${index}`,
+          playerId: playerId ?? null,
           name: playerId ? (getPlayerById(playerId)?.name ?? 'TBD') : 'TBD',
           placement: index + 1,
         }))
       }
     }
-    
+
     // Return 4 empty slots for placeholder
     return Array(4).fill(null).map((_, index) => ({
       id: `placeholder_${index}`,
+      playerId: null,
       name: 'TBD',
       placement: index + 1,
     }))
   }
-  
+
   const ordered = race.completed && race.placements.length ? race.placements : race.players
   return ordered.map((playerId, index) => ({
     id: `${race.id}_${playerId}_${index}`,
+    playerId,
     name: getPlayerById(playerId)?.name ?? '-',
     placement: index + 1,
   }))
 }
 
-const getPositionColor = (round: string, position: number): string => {
-  // Grand finale: Gold, Silver, Bronze, White
-  if (round === 'Grand finale') {
-    if (position === 1) return 'bg-yellow-400 text-yellow-950 border-yellow-500'
-    if (position === 2) return 'bg-gray-300 text-gray-900 border-gray-400'
-    if (position === 3) return 'bg-orange-400 text-orange-950 border-orange-500'
-    return 'bg-white text-ink border-gray-300'
-  }
-  
-  // Loser bracket 1: Top 2 advance (yellow - not safe yet), bottom 2 go to consolation (red)
-  if (round === 'Loser bracket 1') {
-    return position <= 2 ? 'bg-yellow-100 text-yellow-900 border-yellow-300' : 'bg-red-100 text-red-900 border-red-300'
-  }
-  
-  // Loser bracket 2: Only 1st advances (yellow - not safe yet), rest eliminated (red)
-  if (round === 'Loser bracket 2') {
-    return position === 1 ? 'bg-yellow-100 text-yellow-900 border-yellow-300' : 'bg-red-100 text-red-900 border-red-300'
-  }
-  
-  // Qual finale: Top 2 advance to grand finale (green), bottom 2 eliminated (red)
-  if (round === 'Qual finale') {
-    return position <= 2 ? 'bg-green-100 text-green-900 border-green-300' : 'bg-red-100 text-red-900 border-red-300'
-  }
-  
-  // Winner bracket 1 & 2: Top 2 advance (green), 3rd-4th go to loser bracket (yellow)
-  if (round === 'Winner bracket 1' || round === 'Winner bracket 2') {
-    return position <= 2 ? 'bg-green-100 text-green-900 border-green-300' : 'bg-yellow-100 text-yellow-900 border-yellow-300'
-  }
-  
-  // Winner bracket finale: Top 2 advance (green), 3rd-4th go to qual finale (yellow)
-  if (round === 'Winner bracket finale') {
-    return position <= 2 ? 'bg-green-100 text-green-900 border-green-300' : 'bg-yellow-100 text-yellow-900 border-yellow-300'
-  }
-  
-  // Consolation: Determining 5-8th place among already eliminated players
-  if (round === 'Consolation') {
-    return 'bg-slate-100 text-slate-900 border-slate-300'
-  }
-  
-  return 'bg-white text-ink border-gray-300'
-}
-
-const getPositionIndicator = (round: string, position: number): { type: 'icon' | 'text' | null, value: string } => {
-  // Winner bracket 1 & 2: 1st-2nd advance to next winner round (arrow right), 3rd-4th go to loser bracket (arrow down)
-  if (round === 'Winner bracket 1' || round === 'Winner bracket 2') {
-    if (position <= 2) {
-      return { type: 'icon', value: 'arrow-right' }
-    } else {
-      return { type: 'icon', value: 'arrow-down' }
-    }
-  }
-  
-  // Winner bracket finale: 1st-2nd go to grand finale (text), 3rd-4th go to qual finale (arrow down)
-  if (round === 'Winner bracket finale') {
-    if (position <= 2) {
-      return { type: 'text', value: 'grand finale' }
-    } else {
-      return { type: 'icon', value: 'arrow-down' }
-    }
-  }
-  
-  // Loser bracket 1: 1st-2nd advance to loser bracket 2 (arrow right), 3rd-4th go to consolation (text)
-  if (round === 'Loser bracket 1') {
-    if (position <= 2) {
-      return { type: 'icon', value: 'arrow-right' }
-    } else {
-      return { type: 'text', value: 'consolation' }
-    }
-  }
-  
-  // Loser bracket 2: 1st advances to qual finale (arrow right), 2nd-4th eliminated (X)
-  if (round === 'Loser bracket 2') {
-    if (position === 1) {
-      return { type: 'icon', value: 'arrow-right' }
-    } else {
-      return { type: 'icon', value: 'x' }
-    }
-  }
-  
-  // Qual finale: 1st-2nd go to grand finale (text), 3rd-4th eliminated (X)
-  if (round === 'Qual finale') {
-    if (position <= 2) {
-      return { type: 'text', value: 'grand finale' }
-    } else {
-      return { type: 'icon', value: 'x' }
-    }
-  }
-  
-  return { type: null, value: '' }
-}
-
-const shouldShowIndicator = (round: string, position: number): boolean => {
-  const indicator = getPositionIndicator(round, position)
-  const color = getPositionColor(round, position)
-  
-  // If it's the "grand finale" text, always show it
-  if (indicator.type === 'text' && indicator.value === 'grand finale') {
-    return true
-  }
-  
-  // If the color is green or yellow, don't show other indicators
-  if (color.includes('bg-green') || color.includes('bg-yellow')) {
-    return false
-  }
-  
-  // Otherwise, show the indicator
-  return true
-}
 
 const getExpectedRaceCount = (round: string): number => {
   switch (round) {
@@ -784,8 +712,9 @@ const startEditingRace = (raceId: string) => {
 }
 
 const cancelEditingRace = () => {
+  // editingPlacements is left as-is: the editor panel is still mounted while
+  // its leave transition plays, and emptying it would blank the rows mid-slide.
   editingRaceId.value = null
-  editingPlacements.value = []
 }
 
 const saveRaceResult = async () => {
@@ -807,7 +736,6 @@ const saveRaceResult = async () => {
   await bracketStore.saveRace(newRaces[raceIndex] as BracketRaceLocal)
   
   editingRaceId.value = null
-  editingPlacements.value = []
 
   // Force update
   refreshKey.value++
@@ -965,14 +893,15 @@ const availablePlayersForSwap = computed(() => {
 
     <!-- Tournament List -->
     <div v-if="showTournamentList" class="space-y-6">
-      <div class="card p-6">
-        <div class="flex items-center justify-between mb-6">
-          <h2 class="section-title">Your Tournaments</h2>
-          <button @click="showNewTournamentCreation" class="btn btn-primary">
-            <Plus :size="20" />
+      <div class="mk-panel overflow-hidden">
+        <div class="mk-plate mk-plate-red flex items-center justify-between gap-3">
+          <span>Your Tournaments</span>
+          <button @click="showNewTournamentCreation" class="btn btn-accent py-1 text-xs">
+            <Plus :size="16" />
             New Tournament
           </button>
         </div>
+        <div class="p-6">
 
         <div v-if="bracketStore.loading" class="text-center py-8 text-muted">
           Loading tournaments...
@@ -991,25 +920,17 @@ const availablePlayersForSwap = computed(() => {
           <div
             v-for="tournament in bracketStore.tournaments"
             :key="tournament.id"
-            class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
+            class="mk-panel-sm p-4 transition-transform hover:-translate-y-0.5"
           >
             <div class="flex items-start justify-between gap-4">
               <div class="flex-1">
-                <div class="flex items-center gap-2 mb-1">
-                  <h3 class="font-semibold text-lg">{{ tournament.name }}</h3>
-                  <span
-                    v-if="tournament.completed"
-                    class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-800"
-                  >
+                <div class="flex flex-wrap items-center gap-2 mb-1">
+                  <h3 class="font-mk text-lg uppercase tracking-wide text-ink">{{ tournament.name }}</h3>
+                  <span v-if="tournament.completed" class="mk-flag mk-flag-done">
                     <CheckCircle2 :size="12" />
                     Completed
                   </span>
-                  <span
-                    v-else
-                    class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-800"
-                  >
-                    In Progress
-                  </span>
+                  <span v-else class="mk-flag mk-flag-ready">In Progress</span>
                 </div>
                 <div class="text-sm text-muted flex items-center gap-4">
                   <span class="flex items-center gap-1">
@@ -1038,19 +959,22 @@ const availablePlayersForSwap = computed(() => {
             </div>
           </div>
         </div>
+        </div>
       </div>
     </div>
 
     <!-- New Tournament / Player Setup -->
     <div v-else-if="showNewTournamentForm" class="space-y-6">
-      <div class="card p-6">
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="section-title">Create New Tournament</h2>
-          <button @click="cancelNewTournament" class="btn btn-ghost text-sm">
+      <div class="mk-panel overflow-hidden">
+        <div class="mk-plate mk-plate-red flex items-center justify-between gap-3">
+          <span>Create New Tournament</span>
+          <button @click="cancelNewTournament" class="btn btn-ghost py-1 text-xs">
             ← Back to list
           </button>
         </div>
+        <div class="mk-checker h-3 border-b-[3px] border-ink"></div>
 
+        <div class="p-6">
         <div class="mb-6">
           <label class="block text-sm font-medium text-gray-700 mb-2">Tournament Name</label>
           <input
@@ -1063,7 +987,7 @@ const availablePlayersForSwap = computed(() => {
         </div>
 
         <div class="flex items-center justify-between mb-4">
-          <h3 class="text-lg font-semibold">Add players</h3>
+          <h3 class="font-mk text-base uppercase tracking-wide text-ink">Add drivers</h3>
           <button @click="fillTestNames" class="btn btn-ghost text-xs">
             🎮 Fill test-names
           </button>
@@ -1075,15 +999,19 @@ const availablePlayersForSwap = computed(() => {
             :key="index"
             class="flex items-center gap-2"
           >
+            <!-- Preview the colour this driver will race in all tournament -->
             <div
-              class="w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold bg-zinc-200 text-zinc-700"
+              class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md border-2 border-ink font-mk text-[11px] leading-none transition-colors"
+              :style="name.trim()
+                ? { backgroundColor: setupColors[index]?.hex, color: setupColors[index]?.contrast }
+                : { backgroundColor: '#e4e4e7', color: '#71717a' }"
             >
               {{ index + 1 }}
             </div>
             <input
               v-model="playerNames[index]"
               type="text"
-              :placeholder="`Player ${index + 1}`"
+              :placeholder="`Driver ${index + 1}`"
               class="input flex-1"
             />
           </div>
@@ -1100,6 +1028,7 @@ const availablePlayersForSwap = computed(() => {
         <p class="text-sm text-muted mt-4 text-center">
           A minimum of 12 players is required for this tournament style to work.
         </p>
+        </div>
       </div>
     </div>
 
@@ -1112,57 +1041,140 @@ const availablePlayersForSwap = computed(() => {
         <h2 class="text-lg font-semibold">{{ bracketStore.currentTournament?.name }}</h2>
         <div></div>
       </div>
+      <!-- Podium takes over once the grand finale is in the books -->
+      <div v-if="grandFinaleResult" class="card p-6">
+        <BracketPodium :results="grandFinaleResult" />
+      </div>
+
+      <!-- Editing a race slides an enlarged editor into the left third of the
+           tournament view; the whole bracket card moves into what is left and
+           rescales itself to fit. -->
+      <div class="flex items-start">
+      <div
+        class="shrink-0 overflow-hidden transition-[width] duration-500 ease-in-out"
+        :class="editingRace ? 'w-1/3' : 'w-0'"
+      >
+        <div class="min-w-[320px] pr-6">
+          <Transition name="editor">
+            <RaceEditorPanel
+              v-if="editingRace"
+              :race="editingRace"
+              :race-index="editingRace.slot"
+              :round="editingRace.round"
+              :editing-placements="editingPlacements"
+              :get-player-by-id="getPlayerById"
+              :get-position-color="getPositionColor"
+              :get-outcome="getOutcome"
+              :player-colors="playerColors"
+              :is-winner-round="winnerRounds.includes(editingRace.round)"
+              @move-up="movePlayerUp"
+              @move-down="movePlayerDown"
+              @reorder="reorderPlayers"
+              @save="saveRaceResult"
+              @cancel="cancelEditingRace"
+              @swap-player="openSwapModal"
+            />
+          </Transition>
+        </div>
+      </div>
+
+      <div class="min-w-0 flex-1">
       <!-- Bracket overview -->
       <div class="card p-6 space-y-6" :key="`bracket-${refreshKey}`">
-        <div class="flex flex-wrap items-center justify-between gap-2">
+        <div class="flex flex-wrap items-center justify-between gap-3">
           <h2 class="section-title">Tournament bracket</h2>
+          <div class="flex items-center gap-2">
+          <button
+            @click="showRules = true"
+            class="btn btn-ghost gap-1.5 px-3 py-1.5 text-xs"
+            title="Joker, swaps and how to read the bracket"
+          >
+            <HelpCircle :size="14" />
+            Rules
+          </button>
+          </div>
         </div>
 
-        <!-- Legend -->
-        <BracketLegend />
-
-        <div class="space-y-4">
-          <!-- Vertical bracket layout in tournament progression order -->
-          <div class="space-y-6">
-            <div
-              v-for="round in roundOrder"
-              :key="round"
-              class="rounded-lg border border-black/10 p-4 bg-white/40"
-            >
-              <h3 class="text-base font-bold text-muted mb-4">{{ round }}</h3>
-              
-              <!-- Podium for completed Grand finale -->
-              <BracketPodium v-if="round === 'Grand finale' && grandFinaleResult" :results="grandFinaleResult" />
-              
-              <div 
-                v-else
-                class="gap-3"
-                :class="round === 'Winner bracket 1' ? 'grid grid-cols-2 max-w-[544px] mx-auto' : 'flex flex-wrap justify-center'"
+        <!-- Bracket flow: rounds as columns, connected by one line per player -->
+        <BracketFlow
+          :races="races"
+          :bracket-overview="bracketOverview"
+          :player-colors="playerColors"
+          :focused-player-id="focusedPlayerId"
+          :is-elimination="isElimination"
+          :revision="refreshKey"
+        >
+          <template #round="{ round, races: roundRaces }">
+            <section class="mk-panel overflow-hidden">
+              <div
+                class="mk-plate flex items-center justify-between gap-2"
+                :class="round === 'Grand finale'
+                  ? 'mk-plate-gold'
+                  : winnerRounds.includes(round)
+                  ? 'mk-plate-green'
+                  : 'mk-plate-red'"
+              >
+                <span>{{ round }}</span>
+                <span
+                  v-if="currentRound === round"
+                  class="rounded border-2 border-ink bg-white px-1.5 py-0.5 text-[9px] text-ink"
+                  style="text-shadow: none"
+                >
+                  NOW
+                </span>
+              </div>
+              <div v-if="round === 'Grand finale'" class="mk-checker h-3 border-b-2 border-ink"></div>
+              <div
+                class="gap-2.5 p-2.5"
+                :class="round === 'Winner bracket 1' && roundRaces.length > 2
+                  ? 'grid grid-cols-2'
+                  : 'flex flex-col'"
               >
                 <BracketRaceCard
-                  v-for="(race, raceIndex) in bracketOverview[round]"
+                  v-for="(race, raceIndex) in roundRaces"
                   :key="race?.id || `placeholder_${round}_${raceIndex}`"
                   :race="race"
                   :race-index="raceIndex"
                   :round="round"
-                  :is-editing="race?.id === editingRaceId"
-                  :editing-placements="editingPlacements"
+                  :is-active="race?.id === editingRaceId"
                   :get-player-by-id="getPlayerById"
                   :get-position-color="getPositionColor"
-                  :get-position-indicator="getPositionIndicator"
-                  :should-show-indicator="shouldShowIndicator"
                   :get-race-rows="getRaceRows"
-                  :open-swap-modal="openSwapModal"
+                  :player-colors="playerColors"
+                  :focused-player-id="focusedPlayerId"
                   @start-edit="startEditingRace(race!.id)"
-                  @move-up="movePlayerUp"
-                  @move-down="movePlayerDown"
-                  @reorder="reorderPlayers"
-                  @save="saveRaceResult"
-                  @cancel="cancelEditingRace"
-                  @swap-player="openSwapModal"
+                  @focus-player="setHoveredPlayer"
                 />
               </div>
-            </div>
+            </section>
+          </template>
+        </BracketFlow>
+      </div>
+      </div>
+      </div>
+    </div>
+
+    <!-- Rules Modal -->
+    <div
+      v-if="showRules"
+      class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 sm:p-8"
+      @click="showRules = false"
+    >
+      <div class="w-full max-w-3xl" @click.stop>
+        <div class="mk-panel overflow-hidden">
+          <div class="mk-plate mk-plate-red flex items-center justify-between gap-3">
+            <span>Beeriokart Rules</span>
+            <button
+              @click="showRules = false"
+              class="rounded border-2 border-ink bg-white px-2 py-0.5 text-[10px] text-ink"
+              style="text-shadow: none"
+            >
+              Close
+            </button>
+          </div>
+          <div class="mk-checker h-3 border-b-[3px] border-ink"></div>
+          <div class="max-h-[75vh] overflow-y-auto p-4">
+            <BracketLegend />
           </div>
         </div>
       </div>
@@ -1221,6 +1233,26 @@ const availablePlayersForSwap = computed(() => {
 
 
 <style scoped>
+/* The editor fades and slides in as its column widens, so the panel appears to
+   grow out of the bracket rather than pop in on top of it. */
+.editor-enter-active,
+.editor-leave-active {
+  transition: opacity 320ms ease, transform 320ms ease;
+}
+
+.editor-enter-from,
+.editor-leave-to {
+  opacity: 0;
+  transform: translateX(-16px) scale(0.97);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .editor-enter-active,
+  .editor-leave-active {
+    transition: none;
+  }
+}
+
 .beer-background {
   position: relative;
   min-height: 100vh;
