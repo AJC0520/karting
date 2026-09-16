@@ -40,34 +40,97 @@ const emit = defineEmits<{
   swapPlayer: [raceId: string, playerIndex: number]
 }>()
 
-const draggedIndex = ref<number | null>(null)
-const dragOverIndex = ref<number | null>(null)
+/**
+ * Drag to reorder, with the rest of the list sliding out of the way to show
+ * where the driver will land.
+ *
+ * The drop target is worked out from the pointer position against the row
+ * coordinates captured at drag start, never from which element the event landed
+ * on. The rows are being moved by transforms, so asking which one is under the
+ * cursor would fight the animation driving them - this way it does not matter
+ * whether dragover fires on a row or on the list itself.
+ */
+const listEl = ref<HTMLElement | null>(null)
+const dragFrom = ref<number | null>(null)
+const dragTo = ref<number | null>(null)
 
-const handleDragStart = (index: number) => {
-  draggedIndex.value = index
-}
+/** Row midpoints and row pitch, frozen at drag start. */
+let slotCenters: number[] = []
+let slotPitch = 0
 
-const handleDragOver = (event: DragEvent, index: number) => {
-  event.preventDefault()
-  dragOverIndex.value = index
-}
+const handleDragStart = (index: number, event: DragEvent) => {
+  const rows = Array.from(listEl.value?.children ?? []) as HTMLElement[]
+  const rects = rows.map(row => row.getBoundingClientRect())
+  slotCenters = rects.map(r => r.top + r.height / 2)
+  slotPitch = rects.length > 1 ? rects[1].top - rects[0].top : rects[0]?.height ?? 0
 
-const handleDragLeave = () => {
-  dragOverIndex.value = null
-}
+  dragFrom.value = index
+  dragTo.value = index
 
-const handleDrop = (event: DragEvent, toIndex: number) => {
-  event.preventDefault()
-  if (draggedIndex.value !== null && draggedIndex.value !== toIndex) {
-    emit('reorder', draggedIndex.value, toIndex)
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move'
+    // Firefox will not start a drag unless the transfer carries something.
+    event.dataTransfer.setData('text/plain', String(index))
   }
-  draggedIndex.value = null
-  dragOverIndex.value = null
 }
 
+const handleDragOver = (event: DragEvent) => {
+  event.preventDefault()
+  if (dragFrom.value === null) return
+  if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
+
+  // Rows whose original midpoint is above the pointer decide the insert point.
+  let insertion = 0
+  for (const center of slotCenters) {
+    if (event.clientY > center) insertion++
+  }
+  const target = insertion > dragFrom.value ? insertion - 1 : insertion
+  dragTo.value = Math.max(0, Math.min(slotCenters.length - 1, target))
+}
+
+const handleDrop = (event: DragEvent) => {
+  event.preventDefault()
+  const from = dragFrom.value
+  const to = dragTo.value
+  dragFrom.value = null
+  dragTo.value = null
+  if (from !== null && to !== null && from !== to) emit('reorder', from, to)
+}
+
+/** Fires after a drop, and on its own when the driver is released elsewhere. */
 const handleDragEnd = () => {
-  draggedIndex.value = null
-  dragOverIndex.value = null
+  dragFrom.value = null
+  dragTo.value = null
+}
+
+/** How far this row slides to open a gap for the dragged driver. */
+const slotOffset = (index: number): number => {
+  const from = dragFrom.value
+  const to = dragTo.value
+  if (from === null || to === null) return 0
+  if (index === from) return (to - from) * slotPitch
+  if (from < to && index > from && index <= to) return -slotPitch
+  if (from > to && index < from && index >= to) return slotPitch
+  return 0
+}
+
+const rowTransform = (index: number): string => {
+  const shift = `translateY(${slotOffset(index)}px)`
+  return index === dragFrom.value ? `${shift} scale(1.03)` : shift
+}
+
+/**
+ * The finishing position this row would take if the drag ended now, so the
+ * number tile and the outcome badge preview the result as you move.
+ */
+const previewPlacement = (index: number): number => {
+  const from = dragFrom.value
+  const to = dragTo.value
+  if (from === null || to === null) return index + 1
+  if (index === from) return to + 1
+  if (from < to && index > from && index <= to) return index
+  if (from > to && index < from && index >= to) return index + 2
+  return index + 1
 }
 
 const colorFor = (playerId: string): PlayerColor =>
@@ -112,24 +175,26 @@ const getMimicMessage = (playerId: string): string => {
         Drag drivers into finishing order, or use the arrows.
       </p>
 
-      <ul class="space-y-2">
+      <ul
+        ref="listEl"
+        class="space-y-2"
+        @dragover="handleDragOver"
+        @drop="handleDrop"
+      >
         <li
           v-for="(playerId, index) in editingPlacements"
           :key="playerId"
           draggable="true"
-          @dragstart="handleDragStart(index)"
-          @dragover="handleDragOver($event, index)"
-          @dragleave="handleDragLeave"
-          @drop="handleDrop($event, index)"
+          @dragstart="handleDragStart(index, $event)"
+          @dragover="handleDragOver"
+          @drop="handleDrop"
           @dragend="handleDragEnd"
-          class="flex cursor-move items-center gap-2 rounded-lg border-2 p-2 transition-all"
+          class="mk-drag-row flex cursor-grab select-none items-center gap-2 rounded-lg border-2 p-2"
           :class="[
-            getPositionColor(round, index + 1),
-            draggedIndex === index ? 'opacity-40' : '',
-            dragOverIndex === index && draggedIndex !== index
-              ? 'ring-2 ring-inset ring-blue-500'
-              : '',
+            getPositionColor(round, previewPlacement(index)),
+            index === dragFrom ? 'mk-drag-lifted cursor-grabbing' : '',
           ]"
+          :style="{ transform: rowTransform(index) }"
         >
           <GripVertical :size="18" class="flex-shrink-0 text-ink/30" />
 
@@ -137,7 +202,7 @@ const getMimicMessage = (playerId: string): string => {
             class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border-2 border-ink font-mk text-lg leading-none"
             :style="rankStyle(playerId)"
           >
-            {{ index + 1 }}
+            {{ previewPlacement(index) }}
           </span>
 
           <div class="flex min-w-0 flex-1 flex-col">
@@ -150,12 +215,12 @@ const getMimicMessage = (playerId: string): string => {
             >
               {{ getMimicMessage(playerId) }}
             </span>
-            <span v-if="getOutcome(round, index + 1).label" class="mt-1 self-start">
+            <span v-if="getOutcome(round, previewPlacement(index)).label" class="mt-1 self-start">
               <span
                 class="mk-outcome"
-                :class="OUTCOME_CLASS[getOutcome(round, index + 1).tone as keyof typeof OUTCOME_CLASS]"
+                :class="OUTCOME_CLASS[getOutcome(round, previewPlacement(index)).tone as keyof typeof OUTCOME_CLASS]"
               >
-                {{ getOutcome(round, index + 1).label }}
+                {{ getOutcome(round, previewPlacement(index)).label }}
               </span>
             </span>
           </div>
@@ -197,3 +262,28 @@ const getMimicMessage = (playerId: string): string => {
     </div>
   </div>
 </template>
+
+<style scoped>
+/* Rows glide to their new slot rather than snapping, so it stays obvious where
+   the driver being dragged is going to land. */
+.mk-drag-row {
+  transition:
+    transform 180ms cubic-bezier(0.2, 0, 0, 1),
+    background-color 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+/* The row under the cursor is lifted off the list. */
+.mk-drag-lifted {
+  box-shadow: 0 10px 22px rgba(18, 24, 40, 0.3);
+  position: relative;
+  z-index: 10;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mk-drag-row {
+    transition: none;
+  }
+}
+</style>
