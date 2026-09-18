@@ -26,8 +26,10 @@ const ROUND_WEIGHT: Record<string, number> = {
   'Loser bracket 2': 1.5,
   'Winner bracket finale': 2,
   'Qual finale': 2,
-  Consolation: 2,
   'Grand finale': 3,
+  // Consolation is deliberately absent: it only orders players who were
+  // already knocked out at Loser bracket 1 against each other, so it earns
+  // no points of its own - see the tier logic below.
 }
 
 /** Chronological order, used to sort a player's race-by-race breakdown. */
@@ -100,6 +102,7 @@ export function computeBracketStandings(
 
   for (const race of races) {
     if (!race.completed || !race.placements.length) continue
+    if (race.round === 'Consolation') continue
     const weight = ROUND_WEIGHT[race.round] ?? 1
 
     race.placements.forEach((playerId, index) => {
