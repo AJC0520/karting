@@ -52,15 +52,8 @@ const isBeeriokart = computed(() => route.path.startsWith('/beeriokart'))
         </template>
       </RouterLink>
 
-      <!-- Desktop nav -->
-      <div class="hidden md:flex items-center gap-2">
-    
-        </div>
-
-       
-
       <!-- User info -->
-      <div class="hidden md:flex items-center gap-3 shrink-0">
+      <div v-if="authStore.isAuthenticated" class="hidden md:flex items-center gap-3 shrink-0">
         <span class="text-white text-xs">{{ authStore.userEmail }}</span>
         <button
           class="font-mk text-xs text-red-400 hover:text-red-300 bg-white/10 hover:bg-white/20 rounded-lg px-3 py-2 transition-colors"
@@ -69,6 +62,13 @@ const isBeeriokart = computed(() => route.path.startsWith('/beeriokart'))
           LOGOUT
         </button>
       </div>
+      <RouterLink
+        v-else
+        to="/login"
+        class="hidden md:block font-mk text-xs text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-lg px-3 py-2 transition-colors shrink-0"
+      >
+        LOGIN
+      </RouterLink>
 
       <!-- Mobile burger -->
       <button
@@ -87,8 +87,11 @@ const isBeeriokart = computed(() => route.path.startsWith('/beeriokart'))
       <RouterLink to="/create-tournament" class="block text-yellow-400 font-mk" @click="showMobileMenu = false">+ CREATE</RouterLink>
       <RouterLink to="/beeriokart" class="block text-white font-mk" @click="showMobileMenu = false">🍺 BEERIOKART</RouterLink>
       <div class="border-t border-white/10 pt-3 flex items-center justify-between">
-        <span class="text-white/60 text-xs">{{ authStore.userEmail }}</span>
-        <button class="text-red-400 font-mk text-xs" @click="handleLogout">LOGOUT</button>
+        <template v-if="authStore.isAuthenticated">
+          <span class="text-white/60 text-xs">{{ authStore.userEmail }}</span>
+          <button class="text-red-400 font-mk text-xs" @click="handleLogout">LOGOUT</button>
+        </template>
+        <RouterLink v-else to="/login" class="text-white/80 font-mk text-xs" @click="showMobileMenu = false">LOGIN</RouterLink>
       </div>
     </div>
   </nav>

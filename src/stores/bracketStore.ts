@@ -6,6 +6,7 @@ import type { Database, Json } from '@/lib/database.types'
 type BracketTournament = Database['public']['Tables']['bracket_tournaments']['Row']
 type BracketRace = Database['public']['Tables']['bracket_races']['Row']
 type BracketTournamentInsert = Database['public']['Tables']['bracket_tournaments']['Insert']
+type BracketTournamentUpdate = Database['public']['Tables']['bracket_tournaments']['Update']
 type BracketRaceInsert = Database['public']['Tables']['bracket_races']['Insert']
 
 // Simple UUID v4 generator
@@ -38,11 +39,18 @@ interface BracketState {
   currentRaces: BracketRaceLocal[]
   loading: boolean
   error: string | null
+  /** The public /online page's data - always Trikom's, never gated by login. */
+  publicTournaments: BracketTournament[]
+  publicRaces: BracketRace[]
+  publicLoading: boolean
 }
 
 export const useBracketStore = defineStore('bracket', {
   state: (): BracketState => ({
     tournaments: [],
+    publicTournaments: [],
+    publicRaces: [],
+    publicLoading: false,
     currentTournament: null,
     currentRaces: [],
     loading: false,
@@ -82,7 +90,7 @@ export const useBracketStore = defineStore('bracket', {
       }
     },
 
-    async createTournament(name: string, players: BracketPlayer[]) {
+    async createTournament(name: string, players: BracketPlayer[], eventDate?: string, started = true) {
       const authStore = useAuthStore()
       if (!authStore.user) {
         this.error = 'User not authenticated'
@@ -101,6 +109,8 @@ export const useBracketStore = defineStore('bracket', {
           current_round: 'Winner bracket 1',
           completed: false,
           created_at: new Date().toISOString(),
+          event_date: eventDate || new Date().toISOString(),
+          started,
         }
 
         const { data, error } = await supabase
@@ -261,6 +271,49 @@ export const useBracketStore = defineStore('bracket', {
       }
     },
 
+    /**
+     * Updates a roster-only draft in place - saving edits to a not-yet-started
+     * tournament, or promoting one to started once it has enough players -
+     * rather than inserting a second row for the same tournament.
+     */
+    async updateTournamentDraft(
+      tournamentId: string,
+      updates: { name?: string; players?: BracketPlayer[]; eventDate?: string; started?: boolean },
+    ) {
+      this.loading = true
+      this.error = null
+
+      try {
+        const payload: BracketTournamentUpdate = {}
+        if (updates.name !== undefined) payload.name = updates.name
+        if (updates.players !== undefined) payload.players = updates.players as unknown as Json
+        if (updates.eventDate !== undefined) payload.event_date = updates.eventDate
+        if (updates.started !== undefined) payload.started = updates.started
+
+        const { data, error } = await supabase
+          .from('bracket_tournaments')
+          .update(payload)
+          .eq('id', tournamentId)
+          .select()
+          .single()
+
+        if (error) throw error
+
+        this.currentTournament = data
+        const index = this.tournaments.findIndex(t => t.id === tournamentId)
+        if (index !== -1) this.tournaments[index] = data
+        else this.tournaments.unshift(data)
+
+        return data
+      } catch (e: any) {
+        console.error('Failed to update tournament draft:', e)
+        this.error = e.message || 'Failed to update tournament'
+        return null
+      } finally {
+        this.loading = false
+      }
+    },
+
     async deleteTournament(tournamentId: string) {
       try {
         // Delete races first (foreign key constraint)
@@ -293,6 +346,54 @@ export const useBracketStore = defineStore('bracket', {
     clearCurrent() {
       this.currentTournament = null
       this.currentRaces = []
+    },
+
+    /**
+     * Trikom's tournaments, finished or still being played, for the public
+     * /online page - it's a live window onto tonight's bracket, not just a
+     * results archive. Backed by a `get_trikom_tournaments` SECURITY DEFINER
+     * function rather than a relaxed RLS policy, so no table is opened up
+     * for public reads - the function only ever returns rows already scoped
+     * to Trikom's account.
+     */
+    async fetchPublicTournaments() {
+      this.publicLoading = true
+      this.error = null
+
+      try {
+        const { data, error } = await supabase.rpc('get_trikom_tournaments')
+        if (error) throw error
+        // Drafts are included too - they're the "coming up" announcement for
+        // /online, styled around their countdown rather than a bracket.
+        this.publicTournaments = (data || []).sort(
+          (a: BracketTournament, b: BracketTournament) => (a.created_at < b.created_at ? 1 : -1),
+        )
+      } catch (e: any) {
+        console.error('Failed to fetch public tournaments:', e)
+        this.error = e.message || 'Failed to fetch public tournaments'
+      } finally {
+        this.publicLoading = false
+      }
+    },
+
+    async fetchPublicRaces(tournamentId: string) {
+      this.publicLoading = true
+      this.error = null
+
+      try {
+        const { data, error } = await supabase.rpc('get_trikom_races', {
+          p_tournament_id: tournamentId,
+        })
+        if (error) throw error
+        this.publicRaces = data || []
+        return this.publicRaces
+      } catch (e: any) {
+        console.error('Failed to fetch public races:', e)
+        this.error = e.message || 'Failed to fetch public races'
+        return []
+      } finally {
+        this.publicLoading = false
+      }
     },
   },
 })

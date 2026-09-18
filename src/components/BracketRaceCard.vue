@@ -34,6 +34,9 @@ const props = defineProps<{
   getRaceRows: (race: BracketRace | null, round: string, raceIndex: number) => RaceRow[]
   playerColors?: Record<string, PlayerColor>
   focusedPlayerId?: string | null
+  /** True once the tournament is finished - the card stops looking or
+   *  behaving like something you can click into. */
+  isLocked?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -86,10 +89,10 @@ const getMimicMessage = (playerId: string | null): string => {
         ? 'mk-panel-sm'
         : 'border-dashed border-ink/25 bg-white/40',
       race && !race.completed ? 'mk-card-live' : '',
-      race ? 'cursor-pointer transition-transform hover:-translate-y-0.5' : '',
+      race && !isLocked ? 'cursor-pointer transition-transform hover:-translate-y-0.5' : '',
       isActive ? 'mk-card-active' : '',
     ]"
-    @click="race && emit('startEdit')"
+    @click="race && !isLocked && emit('startEdit')"
   >
     <div
       class="flex items-center justify-between gap-2 border-b-2 px-2 py-1"

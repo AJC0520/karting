@@ -38,6 +38,19 @@ const players = ref<BracketPlayer[]>([])
 const races = ref<BracketRace[]>([])
 const playerNames = ref<string[]>(Array(16).fill(''))
 const tournamentName = ref('')
+const eventDate = ref('')
+/** Set while the setup form is editing an existing draft (a tournament
+ *  saved with fewer than 12 players) rather than starting a brand new one -
+ *  so saving/starting updates that row instead of inserting a duplicate. */
+const editingTournamentId = ref<string | null>(null)
+
+/** `datetime-local` wants "YYYY-MM-DDTHH:mm" in local time, with no timezone
+ *  suffix - toISOString() gives UTC, so this formats from the local getters
+ *  instead. Used both to default the field to "now" and to read it back. */
+const toLocalDateTimeInput = (date: Date): string => {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
 const currentRound = ref<string | null>(null)
 const editingRaceId = ref<string | null>(null)
 const editingPlacements = ref<string[]>([])
@@ -75,6 +88,8 @@ const setupColors = computed(() => {
   const colors = buildPlayerColors(filled)
   return filled.map(slot => colors[slot.id])
 })
+
+const filledDriverCount = computed(() => playerNames.value.filter(name => name.trim()).length)
 
 const setHoveredPlayer = (playerId: string | null) => {
   focusedPlayerId.value = playerId
@@ -242,34 +257,67 @@ const showNewTournamentCreation = () => {
   players.value = []
   playerNames.value = Array(16).fill('')
   tournamentName.value = ''
+  eventDate.value = toLocalDateTimeInput(new Date())
+  editingTournamentId.value = null
   jokerCount.value = 0
 }
 
 const cancelNewTournament = () => {
   showTournamentList.value = true
   showNewTournamentForm.value = false
+  editingTournamentId.value = null
 }
 
 const startTournament = async () => {
   collectPlayers()
-  
-  if (players.value.length < 12) {
-    alert('You need at least 12 players')
-    return
-  }
-  
+
   if (!tournamentName.value.trim()) {
     alert('Please enter a tournament name')
     return
   }
-  
-  // Create tournament in database
-  const tournament = await bracketStore.createTournament(tournamentName.value.trim(), players.value)
+
+  const eventDateIso = eventDate.value ? new Date(eventDate.value).toISOString() : undefined
+
+  // Fewer than 12 players: save the roster as a draft (no races yet) rather
+  // than blocking the save entirely - the host can come back and add more
+  // drivers, or a partial roster can just sit visible in the tournament list.
+  if (players.value.length < 12) {
+    const saved = editingTournamentId.value
+      ? await bracketStore.updateTournamentDraft(editingTournamentId.value, {
+          name: tournamentName.value.trim(),
+          players: players.value,
+          eventDate: eventDateIso,
+        })
+      : await bracketStore.createTournament(tournamentName.value.trim(), players.value, eventDateIso, false)
+
+    if (!saved) {
+      alert('Failed to save tournament')
+      return
+    }
+
+    alert(`Saved as a draft - add ${12 - players.value.length} more driver(s) before it can start.`)
+    showNewTournamentForm.value = false
+    showTournamentList.value = true
+    editingTournamentId.value = null
+    await bracketStore.fetchTournaments()
+    return
+  }
+
+  // Create (or promote a draft to) a started tournament in the database
+  const tournament = editingTournamentId.value
+    ? await bracketStore.updateTournamentDraft(editingTournamentId.value, {
+        name: tournamentName.value.trim(),
+        players: players.value,
+        eventDate: eventDateIso,
+        started: true,
+      })
+    : await bracketStore.createTournament(tournamentName.value.trim(), players.value, eventDateIso)
   if (!tournament) {
     alert('Failed to create tournament')
     return
   }
-  
+  editingTournamentId.value = null
+
   // Initialize bracket structure
   races.value = []
   currentRound.value = 'Winner bracket 1'
@@ -337,18 +385,42 @@ const loadTournament = async (tournamentId: string) => {
     alert('Failed to load tournament')
     return
   }
-  
-  // Load tournament data
+
   const { tournament, races: loadedRaces } = result
+
+  // A draft (saved with fewer than 12 players) never got races - reopen the
+  // setup form instead of an empty bracket, so more drivers can be added.
+  if (!tournament.started) {
+    const draftPlayers = tournament.players as BracketPlayer[]
+    playerNames.value = Array(16).fill('')
+    draftPlayers.forEach((p, i) => {
+      if (i < 16) playerNames.value[i] = p.name
+    })
+    tournamentName.value = tournament.name
+    eventDate.value = tournament.event_date
+      ? toLocalDateTimeInput(new Date(tournament.event_date))
+      : toLocalDateTimeInput(new Date())
+    editingTournamentId.value = tournamentId
+    showTournamentList.value = false
+    showNewTournamentForm.value = true
+    return
+  }
+
+  // Load tournament data
   players.value = tournament.players as BracketPlayer[]
   races.value = loadedRaces as BracketRace[]
   currentRound.value = tournament.current_round
   showTournamentList.value = false
-  
+
   // Reset joker count based on loaded jokers
   jokerCount.value = players.value.filter(p => isJoker(p.id)).length
-  
+
   refreshKey.value++
+}
+
+const confirmDeleteTournament = (tournamentId: string, name: string) => {
+  if (!confirm(`Delete "${name}"? This removes all its races and cannot be undone.`)) return
+  bracketStore.deleteTournament(tournamentId)
 }
 
 const backToTournamentList = () => {
@@ -742,10 +814,15 @@ const getPlayerById = (id: string) => {
   return players.value.find(p => p.id === id)
 }
 
+/** Once a tournament is done, its result is the record - races stop being
+ *  editable so a finished bracket can't quietly change after the fact. */
+const isTournamentLocked = computed(() => bracketStore.currentTournament?.completed ?? false)
+
 const startEditingRace = (raceId: string) => {
+  if (isTournamentLocked.value) return
   const race = races.value.find(r => r.id === raceId)
   if (!race) return
-  
+
   editingRaceId.value = raceId
   editingPlacements.value = race.completed ? [...race.placements] : [...race.players]
 }
@@ -790,9 +867,11 @@ const saveRaceResult = async () => {
     await bracketStore.updateTournamentRound(currentRound.value)
   }
   
-  // Check if tournament is complete (Grand finale is done)
-  const grandFinale = races.value.find(r => r.round === 'Grand finale')
-  if (grandFinale?.completed) {
+  // Only mark the tournament complete once every race - Grand finale and
+  // Consolation alike - is actually done, matching what the reveal itself
+  // waits for. Otherwise /online's public list (which keys off this flag)
+  // could show a tournament as finished before Consolation was played.
+  if (tournamentFinished.value) {
     await bracketStore.completeTournament()
   }
   
@@ -969,6 +1048,7 @@ const availablePlayersForSwap = computed(() => {
                     <CheckCircle2 :size="12" />
                     Completed
                   </span>
+                  <span v-else-if="!tournament.started" class="mk-flag mk-flag-tbd">Draft</span>
                   <span v-else class="mk-flag mk-flag-ready">In Progress</span>
                 </div>
                 <div class="text-sm text-muted flex items-center gap-4">
@@ -976,7 +1056,10 @@ const availablePlayersForSwap = computed(() => {
                     <Calendar :size="14" />
                     {{ new Date(tournament.created_at).toLocaleDateString() }}
                   </span>
-                  <span>{{ (tournament.players as any[]).length }} players</span>
+                  <span>
+                    {{ (tournament.players as any[]).length }} players
+                    <template v-if="!tournament.started">(need 12 to start)</template>
+                  </span>
                 </div>
               </div>
               <div class="flex items-center gap-2">
@@ -985,10 +1068,10 @@ const availablePlayersForSwap = computed(() => {
                   class="btn btn-ghost btn-sm"
                 >
                   <List :size="16" />
-                  {{ tournament.completed ? 'View' : 'Continue' }}
+                  {{ tournament.completed ? 'View' : tournament.started ? 'Continue' : 'Edit' }}
                 </button>
                 <button
-                  @click="bracketStore.deleteTournament(tournament.id)"
+                  @click="confirmDeleteTournament(tournament.id, tournament.name)"
                   class="btn btn-ghost btn-sm text-red-600 hover:bg-red-50"
                   title="Delete tournament"
                 >
@@ -1006,7 +1089,7 @@ const availablePlayersForSwap = computed(() => {
     <div v-else-if="showNewTournamentForm" class="space-y-6">
       <div class="mk-panel overflow-hidden">
         <div class="mk-plate mk-plate-red flex items-center justify-between gap-3">
-          <span>Create New Tournament</span>
+          <span>{{ editingTournamentId ? 'Edit Draft Tournament' : 'Create New Tournament' }}</span>
           <button @click="cancelNewTournament" class="btn btn-ghost py-1 text-xs">
             ← Back to list
           </button>
@@ -1023,6 +1106,18 @@ const availablePlayersForSwap = computed(() => {
             class="input w-full"
             required
           />
+        </div>
+
+        <div class="mb-6">
+          <label class="block text-sm font-medium text-gray-700 mb-2">Played on</label>
+          <input
+            v-model="eventDate"
+            type="datetime-local"
+            class="input w-full"
+          />
+          <p class="text-xs text-muted mt-1">
+            Set this ahead of time to show a countdown on /online, or backdate it to log a tournament that already happened.
+          </p>
         </div>
 
         <div class="flex items-center justify-between mb-4">
@@ -1062,10 +1157,21 @@ const availablePlayersForSwap = computed(() => {
           :disabled="bracketStore.loading"
         >
           <Trophy :size="20" />
-          {{ bracketStore.loading ? 'Creating...' : 'Start Tournament' }}
+          {{
+            bracketStore.loading
+              ? 'Saving...'
+              : filledDriverCount < 12
+              ? 'Save Draft'
+              : 'Start Tournament'
+          }}
         </button>
         <p class="text-sm text-muted mt-4 text-center">
-          A minimum of 12 players is required for this tournament style to work.
+          <template v-if="filledDriverCount < 12">
+            {{ filledDriverCount }}/12 drivers - save now and add the rest later, or keep going until you hit 12 to start right away.
+          </template>
+          <template v-else>
+            A minimum of 12 players is required for this tournament style to work.
+          </template>
         </p>
         </div>
       </div>
@@ -1190,6 +1296,7 @@ const availablePlayersForSwap = computed(() => {
                   :get-race-rows="getRaceRows"
                   :player-colors="playerColors"
                   :focused-player-id="focusedPlayerId"
+                  :is-locked="isTournamentLocked"
                   @start-edit="startEditingRace(race!.id)"
                   @focus-player="setHoveredPlayer"
                 />

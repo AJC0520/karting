@@ -12,6 +12,7 @@ import MapView from '@/views/MapView.vue'
 import LoginView from '@/views/LoginView.vue'
 import SignupView from '@/views/SignupView.vue'
 import BeerikartView from '@/views/BeerikartView.vue'
+import OnlineView from '@/views/OnlineView.vue'
 
 export const routes: RouteRecordRaw[] = [
   {
@@ -55,6 +56,11 @@ export const routes: RouteRecordRaw[] = [
     name: 'beeriokart',
     component: BeerikartView,
     meta: { requiresAuth: true },
+  },
+  {
+    path: '/online',
+    name: 'online',
+    component: OnlineView,
   },
   {
     path: '/t/:id/leaderboard',
