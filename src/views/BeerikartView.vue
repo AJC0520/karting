@@ -7,11 +7,14 @@ import { supabase } from '@/lib/supabase'
 import type { Json } from '@/lib/database.types'
 import BracketLegend from '@/components/BracketLegend.vue'
 import BracketPodium from '@/components/BracketPodium.vue'
+import BracketLeaderboard from '@/components/BracketLeaderboard.vue'
+import PlayerScoreBreakdown from '@/components/PlayerScoreBreakdown.vue'
 import BracketRaceCard from '@/components/BracketRaceCard.vue'
 import BracketFlow from '@/components/BracketFlow.vue'
 import RaceEditorPanel from '@/components/RaceEditorPanel.vue'
 import MapWheelSpinner from '@/components/MapWheelSpinner.vue'
 import { buildPlayerColors } from '@/utils/playerColors'
+import { computeBracketStandings } from '@/utils/bracketScoring'
 import {
   getPositionColor,
   getOutcome,
@@ -161,6 +164,42 @@ const bracketOverview = computed(() => {
   
   return result
 })
+
+/**
+ * True once every race that exists - including Consolation, which doesn't
+ * gate bracket progression and can lag behind the Grand finale - is played.
+ * The reveal (podium, standings, score breakdowns) waits for this rather
+ * than just the Grand finale, so nobody's final spot is still undecided.
+ */
+const tournamentFinished = computed(() => {
+  const _ = refreshKey.value
+  return races.value.length > 0 && races.value.every(r => r.completed)
+})
+
+/**
+ * The full points ranking, computed from every completed race but kept out
+ * of the bracket view entirely until the whole tournament is done - it
+ * should feel like a reveal, not a running leaderboard racers can watch and
+ * play to.
+ */
+const bracketStandings = computed(() => {
+  if (!tournamentFinished.value) return []
+  return computeBracketStandings(
+    races.value,
+    players.value.map(p => p.id),
+  )
+})
+
+/** The hovered driver's race-by-race score, once it's safe to reveal it. */
+const focusedStanding = computed(() => {
+  if (!tournamentFinished.value || !focusedPlayerId.value) return null
+  return bracketStandings.value.find(s => s.playerId === focusedPlayerId.value) ?? null
+})
+
+const mousePos = ref({ x: 0, y: 0 })
+const updateMousePos = (event: MouseEvent) => {
+  mousePos.value = { x: event.clientX, y: event.clientY }
+}
 
 const grandFinaleResult = computed(() => {
   const grandFinaleRaces = bracketOverview.value['Grand finale']
@@ -1041,15 +1080,24 @@ const availablePlayersForSwap = computed(() => {
         <h2 class="text-lg font-semibold">{{ bracketStore.currentTournament?.name }}</h2>
         <div></div>
       </div>
-      <!-- Podium takes over once the grand finale is in the books -->
-      <div v-if="grandFinaleResult" class="card p-6">
-        <BracketPodium :results="grandFinaleResult" />
+      <!-- Podium and full standings only take over once every race - Grand
+           finale and the slower-to-get-to Consolation alike - is done, so
+           nobody's final spot is revealed while a match is still open. -->
+      <div v-if="tournamentFinished && grandFinaleResult" class="space-y-6">
+        <div class="card p-6">
+          <BracketPodium :results="grandFinaleResult" />
+        </div>
+        <BracketLeaderboard
+          :standings="bracketStandings"
+          :get-player-name="(id: string) => getPlayerById(id)?.name ?? '-'"
+          :player-colors="playerColors"
+        />
       </div>
 
       <!-- Editing a race slides an enlarged editor into the left third of the
            tournament view; the whole bracket card moves into what is left and
            rescales itself to fit. -->
-      <div class="flex items-start">
+      <div class="flex items-start" @mousemove="updateMousePos">
       <div
         class="shrink-0 overflow-hidden transition-[width] duration-500 ease-in-out"
         :class="editingRace ? 'w-1/3' : 'w-0'"
@@ -1210,6 +1258,22 @@ const availablePlayersForSwap = computed(() => {
           </button>
         </div>
       </div>
+    </div>
+
+    <!-- Follows the cursor while a driver is hovered anywhere in the finished
+         bracket, showing exactly how their total was built up. -->
+    <div
+      v-if="focusedStanding"
+      class="pointer-events-none fixed z-50"
+      :style="{ left: `${mousePos.x + 18}px`, top: `${mousePos.y + 18}px` }"
+    >
+      <PlayerScoreBreakdown
+        :player-name="getPlayerById(focusedStanding.playerId)?.name ?? '-'"
+        :player-color="playerColors[focusedStanding.playerId]"
+        :placement="focusedStanding.placement"
+        :total-points="focusedStanding.totalPoints"
+        :races="focusedStanding.races"
+      />
     </div>
   </div>
 

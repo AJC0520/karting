@@ -45,11 +45,6 @@ const props = defineProps<{
  * lane, the loser bracket along the bottom, and both converge on the grand
  * finale at the right.
  */
-const LANES = [
-  { id: 'winner', label: 'Winner bracket' },
-  { id: 'loser', label: 'Loser bracket' },
-] as const
-
 interface RoundPlacement {
   round: string
   column: number
@@ -299,7 +294,7 @@ defineExpose({ measure: scheduleMeasure })
   <div class="pb-4">
     <div ref="viewport" class="overflow-x-auto">
     <div ref="spacer">
-    <div ref="canvas" class="bracket-canvas relative w-max origin-top-left">
+    <div ref="canvas" class="bracket-canvas relative w-max origin-top-left pt-4">
       <!-- Connector layer: behind the cards, so lines only show in the gaps -->
       <svg
         class="pointer-events-none absolute inset-0 z-0"
@@ -384,16 +379,6 @@ defineExpose({ measure: scheduleMeasure })
     </div>
 
     <div class="mt-3 flex flex-wrap items-center gap-2">
-      <span
-        v-for="lane in LANES"
-        :key="lane.id"
-        class="mk-flag"
-        :class="lane.id === 'winner'
-          ? 'bg-green-400 text-green-950'
-          : 'bg-red-400 text-red-950'"
-      >
-        {{ lane.label }}
-      </span>
       <span class="mk-flag border-dashed bg-white text-ink">
         Hover a driver to trace their path
       </span>
